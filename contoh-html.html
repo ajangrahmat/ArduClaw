@@ -1,0 +1,348 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>avisha.id — Sedang Dalam Perbaikan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --orange: #FF6B00;
+      --orange-light: #FF8C33;
+      --orange-pale: #FFF3E8;
+      --dark: #1C1C1E;
+      --gray: #6E6E73;
+      --gray-light: #AEAEB2;
+      --bg: #FFFFFF;
+      --surface: #F5F5F7;
+      --border: rgba(0,0,0,0.08);
+      --font: 'Nunito', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--dark);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Grid bg */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,107,0,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,107,0,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0;
+    }
+
+    /* Blobs */
+    .blob {
+      position: fixed; border-radius: 50%;
+      filter: blur(90px); opacity: 0.16;
+      pointer-events: none; z-index: 0;
+      animation: floatBlob 9s ease-in-out infinite;
+    }
+    .blob-1 { width: 520px; height: 520px; background: var(--orange); top: -160px; right: -120px; }
+    .blob-2 { width: 320px; height: 320px; background: #FFAD00; bottom: 40px; left: -90px; animation-delay: -4s; }
+
+    @keyframes floatBlob {
+      0%,100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-22px) scale(1.04); }
+    }
+
+    /* Page wrapper */
+    .page {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 24px 60px;
+    }
+
+    /* Logo */
+    .logo-wrap {
+      margin-bottom: 10px;
+      animation: fadeDown 0.6s ease both;
+    }
+    .logo-wrap img { height: 40px; width: auto; }
+
+    /* Badge */
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--orange-pale);
+      border: 1.5px solid rgba(255,107,0,0.2);
+      color: var(--orange);
+      font-size: 11.5px; font-weight: 700;
+      letter-spacing: 0.09em; text-transform: uppercase;
+      padding: 5px 14px; border-radius: 100px;
+      margin-bottom: 36px;
+      animation: fadeDown 0.6s 0.1s ease both;
+    }
+    .badge-dot {
+      width: 7px; height: 7px;
+      background: var(--orange); border-radius: 50%;
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.45; transform: scale(0.7); }
+    }
+
+    /* Desktop: side-by-side row */
+    .content-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 0;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    /* Character */
+    .character-wrap {
+      flex-shrink: 0;
+      animation: fadeUp 0.8s 0.15s ease both;
+      margin-right: -18px;
+      z-index: 2;
+    }
+    .character-wrap img {
+      width: 300px;
+      height: auto;
+      filter: drop-shadow(0 16px 40px rgba(255,107,0,0.18));
+      display: block;
+    }
+
+    /* Card */
+    .card {
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(20px) saturate(1.5);
+      -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 38px 40px 38px 52px;
+      max-width: 460px;
+      width: 100%;
+      text-align: left;
+      box-shadow:
+        0 2px 8px rgba(0,0,0,0.04),
+        0 20px 60px rgba(0,0,0,0.07),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      animation: fadeUp 0.8s 0.25s ease both;
+      z-index: 1;
+    }
+
+    .card h1 {
+      font-size: clamp(24px, 3.5vw, 32px);
+      font-weight: 800;
+      color: var(--dark);
+      line-height: 1.2;
+      margin-bottom: 12px;
+      letter-spacing: -0.4px;
+    }
+    .card h1 span { color: var(--orange); }
+
+    .card p {
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--gray);
+      font-weight: 400;
+      margin-bottom: 26px;
+    }
+
+    /* Progress */
+    .progress-section { margin-bottom: 24px; }
+    .progress-label {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .progress-label span { font-size: 12.5px; font-weight: 600; color: var(--gray); }
+    .progress-label .pct { color: var(--orange); font-weight: 700; }
+    .progress-track { height: 7px; background: var(--surface); border-radius: 100px; overflow: hidden; }
+    .progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--orange), var(--orange-light));
+      border-radius: 100px;
+      transition: width 2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Chips */
+    .chips {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .chip {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 7px 12px;
+      font-size: 12.5px; font-weight: 600; color: var(--dark);
+    }
+    .chip svg { flex-shrink: 0; }
+
+    /* Contact */
+    .contact-row {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      font-size: 13.5px; color: var(--gray);
+    }
+    .contact-row a {
+      color: var(--orange); font-weight: 700;
+      text-decoration: none;
+      border-bottom: 1.5px solid rgba(255,107,0,0.25);
+      transition: border-color 0.2s;
+    }
+    .contact-row a:hover { border-color: var(--orange); }
+
+    /* Footer */
+    .footer {
+      margin-top: 28px;
+      font-size: 12.5px; color: var(--gray-light); text-align: center;
+      animation: fadeUp 0.8s 0.5s ease both;
+    }
+    .footer strong { color: var(--gray); }
+
+    /* Animations */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Mobile: stack vertically */
+    @media (max-width: 720px) {
+      .content-row {
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+      .character-wrap {
+        margin-right: 0;
+        margin-bottom: -10px;
+      }
+      .character-wrap img { width: 210px; }
+      .card {
+        text-align: center;
+        padding: 28px 22px;
+        border-radius: 22px;
+      }
+      .chips { justify-content: center; }
+      .contact-row { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <main class="page">
+
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <img src="logo.webp" alt="avisha.id" />
+    </div>
+
+    <!-- Badge -->
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Lagi Maintenance, Nii-san~
+    </div>
+
+    <!-- Side-by-side row -->
+    <div class="content-row">
+
+      <!-- Mascot -->
+      <div class="character-wrap">
+        <img src="karakter.webp" alt="Maskot avisha.id" />
+      </div>
+
+      <!-- Card -->
+      <div class="card">
+        <h1>Ittai~! Website<br>Lagi <span>Maintenance</span></h1>
+        <p>
+          Gomenasai kak, website-nya lagi di-upgrade biar makin kenceng dan keren!
+          Sabar dikit ya, bentar lagi balik — nani mo shinpai shinaide!
+        </p>
+
+        <!-- Progress -->
+        <div class="progress-section">
+          <div class="progress-label">
+            <span>Progres perbaikan</span>
+            <span class="pct" id="pct-label">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- Chips -->
+        <div class="chips">
+          <div class="chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Mou Sugu da yo~
+          </div>
+          <div class="chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Sugoi Upgrade!
+          </div>
+          <div class="chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+            </svg>
+            Kawaii dan Kenceng
+          </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="contact-row">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/>
+          </svg>
+          Nani? Ada yang mau ditanya? Japri aja di
+          <a href="https://wa.me/6281287931296" target="_blank">WhatsApp</a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      2026 <strong>avisha.id</strong> · Semua hak dilindungi
+    </div>
+
+  </main>
+
+  <script>
+    window.addEventListener('load', () => {
+      const fill = document.getElementById('progress-fill');
+      const label = document.getElementById('pct-label');
+      const target = 72;
+      let current = 0;
+      requestAnimationFrame(() => { fill.style.width = target + '%'; });
+      const interval = setInterval(() => {
+        if (current >= target) { clearInterval(interval); return; }
+        current++;
+        label.textContent = current + '%';
+      }, 2000 / target);
+    });
+  </script>
+
+</body>
+</html>
