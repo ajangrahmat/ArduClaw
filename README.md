@@ -1,296 +1,46 @@
 
 # ArduClaw
 
-> Lightweight AI Automation Runtime for ESP32 & Arduino
-
-ArduClaw adalah framework automation ringan untuk ESP32 dan Arduino yang terinspirasi dari konsep modern edge automation seperti ESP-Claw, tetapi dibuat lebih sederhana, lebih ringan, dan lebih mudah digunakan pada microcontroller dengan RAM kecil.
-
-ArduClaw fokus pada:
-- Event-driven automation
-- Rule-based actions
-- Lightweight runtime
-- Web-based setup
-- AI/LLM integration (optional)
-- Beginner-friendly workflow
+> **Lightweight AI Automation Runtime for ESP32 & Arduino**  
+> **Runtime Otomatisasi AI Ringan untuk ESP32 & Arduino**
 
 ---
 
-# ✨ Features
+## 🌐 EN / ID
 
-## 🚀 Lightweight Runtime
-- Tidak membutuhkan PSRAM
-- Cocok untuk ESP32 biasa
-- RAM usage rendah
-- Fast boot
+<details open>
+<summary><b>English</b></summary>
 
----
+ArduClaw is a lightweight automation runtime for ESP32, inspired by modern edge automation concepts (ESP-Claw). It features an event-driven skill system, LLM/AI integration, MQTT support, web dashboard, and a browser-based firmware flasher — all running on commodity ESP32 hardware without PSRAM.
 
-## ⚡ Event System
-Automation berbasis event.
+### Features
 
-Contoh:
-```cpp
-emit("motion_detected");
-````
+- **Lightweight Runtime** — ~50–120KB RAM, ~500KB–1.5MB flash. No PSRAM needed.
+- **Event-Driven Skill System** — GPIO, ADC, PWM, I2C, SPI, UART control via JSON tool calling.
+- **LLM/AI Integration** — OpenAI, Gemini, OpenRouter, Ollama, or any OpenAI-compatible API.
+- **WiFi Manager** — Configure SSID/password without recompiling firmware.
+- **MQTT Support** — Publish, subscribe with wildcard matching and action dispatch.
+- **Web Dashboard** — Chat with AI, device status, WiFi/LLM/MQTT config, skill list.
+- **Blink & Monitor Tasks** — Non-blocking GPIO blink, pin state monitoring with debounce.
+- **NVS Persistence** — GPIO modes, monitor rules, and MQTT subscriptions survive reboot.
+- **Browser Flasher** — Upload firmware `.bin` via Web Serial API.
+- **Multi-Task Architecture** — Dual-core FreeRTOS: Core 0 (loop, skill, mqtt), Core 1 (wifi, llm).
 
----
+### Project Structure
 
-## 🧠 Rule Engine
-
-Membuat automation sederhana.
-
-```cpp
-when("motion_detected", turnOnLamp);
 ```
-
----
-
-## 🌐 Web Flasher
-
-Upload firmware `.bin` langsung dari browser.
-
-Fitur:
-
-* drag & drop firmware
-* Web Serial API
-* flash progress
-* auto reboot
-
----
-
-## 📶 WiFi Setup
-
-Setup WiFi tanpa recompile firmware.
-
----
-
-## 🤖 AI / LLM Integration
-
-Optional AI integration:
-
-* OpenAI
-* Gemini
-* OpenRouter
-* Ollama
-* Custom API
-
----
-
-## 🖥️ Web Dashboard
-
-Simple browser dashboard untuk:
-
-* monitoring
-* GPIO control
-* serial terminal
-* event logs
-* OTA update
-
----
-
-## 🔌 Modular Architecture
-
-Module dapat diaktif/nonaktifkan sesuai kebutuhan.
-
----
-
-# 🎯 Goals
-
-ArduClaw dibuat untuk:
-
-* maker
-* hobbyist
-* pelajar
-* project IoT
-* smart home
-* wearable
-* robot sederhana
-
-Dengan fokus:
-
-```text
-Simple
-Lightweight
-Modular
-Easy to Use
-```
-
----
-
-# 🧠 Philosophy
-
-> "Small Devices, Smart Automation"
-
-ArduClaw tidak mencoba menjadi AI runtime besar.
-
-Tujuannya adalah membawa konsep automation modern ke:
-
-* ESP32 murah
-* board kecil
-* project sederhana
-* Arduino ecosystem
-
----
-
-# ⚙️ Development Environment
-
-## IDE
-
-* Visual Studio Code
-
-## Extension
-
-* PlatformIO IDE
-
-## Framework
-
-* Arduino Framework
-
----
-
-# 📦 Project Structure
-
-```text
 ArduClaw/
-├── include/
-├── lib/
-│   ├── ArduClawCore/
-│   ├── ArduClawWiFi/
-│   ├── ArduClawMQTT/
-│   ├── ArduClawLLM/
-│   └── ArduClawDashboard/
-│
-├── src/
-├── data/
-├── docs/
-├── webflasher/
+├── include/          # Headers: hal.h, skill.h, dashboard.h
+├── src/              # Source: main.cpp, hal.cpp, skill.cpp
+├── lib/ArduClawLLM/  # LLM client library
+├── ArduClaw-flasher/ # Web-based firmware flasher
 ├── test/
-└── platformio.ini
+├── skills.md         # Full skill specification
+├── platformio.ini    # PlatformIO config
+└── build.ps1         # Build & merge script
 ```
 
----
-
-# 🔥 Core Architecture
-
-```text
-Sensor/Input
-      ↓
-Event System
-      ↓
-Rule Engine
-      ↓
-Action Executor
-      ↓
-GPIO / MQTT / API / LLM
-```
-
----
-
-# 🔌 Example Usage
-
-## Event
-
-```cpp
-emit("door_open");
-```
-
----
-
-## Rule
-
-```cpp
-when("door_open", turnOnLamp);
-```
-
----
-
-## Action
-
-```cpp
-void turnOnLamp() {
-  digitalWrite(RELAY_PIN, HIGH);
-}
-```
-
----
-
-# 🌐 Web Interface
-
-ArduClaw menyediakan web interface sederhana untuk:
-
-## Firmware Flasher
-
-* upload `.bin`
-* flash ESP32
-* erase flash
-
-## WiFi Setup
-
-* SSID
-* password
-* reconnect settings
-
-## LLM Setup
-
-* provider
-* API key
-* endpoint
-* model
-
-## Dashboard
-
-* live logs
-* device status
-* RAM usage
-* GPIO control
-
-## Serial Terminal
-
-* realtime serial monitor
-* command input
-
----
-
-# 🔧 Serial Commands
-
-## WiFi
-
-```text
-wifi set MyWiFi password123
-wifi status
-wifi reset
-```
-
----
-
-## LLM
-
-```text
-llm provider openai
-llm api_key sk-xxxx
-llm model gpt-4o-mini
-```
-
----
-
-## Device
-
-```text
-device info
-device restart
-```
-
----
-
-## Event
-
-```text
-emit relay_on
-```
-
----
-
-# 📡 Supported Boards
+### Supported Boards
 
 | Board        | Status       |
 | ------------ | ------------ |
@@ -300,120 +50,100 @@ emit relay_on
 | ESP32-S2     | ⚠️           |
 | ESP8266      | Experimental |
 
+### Quick Start
+
+1. Install [PlatformIO](https://platformio.org) in VS Code.
+2. Open the project folder.
+3. Build: `pio run`
+4. Upload: `pio run --target upload`
+5. Open Serial Monitor (115200 baud) and send JSON commands.
+
+### Firmware Build
+
+Run `build.ps1` to merge bootloader + partitions + firmware into one flashable binary for the browser flasher.
+
+### Tech Stack
+
+- **Framework:** Arduino Framework on ESP-IDF / FreeRTOS
+- **Language:** C++17
+- **IDE:** Visual Studio Code + PlatformIO
+- **Web UI:** Vanilla HTML/CSS/JS (no frameworks)
+- **Flasher:** Tailwind CSS, Web Serial API
+
 ---
 
-# 📉 Resource Target
+</details>
 
-## RAM Usage
+<details>
+<summary><b>Bahasa Indonesia</b></summary>
 
-```text
-~50KB - 120KB
+ArduClaw adalah runtime otomatisasi ringan untuk ESP32, terinspirasi dari konsep edge automation modern (ESP-Claw), tetapi dibuat lebih sederhana dan ringan. Dilengkapi dengan sistem skill berbasis event, integrasi AI/LLM, dukungan MQTT, dashboard web, dan firmware flasher dari browser.
+
+### Fitur
+
+- **Runtime Ringan** — ~50–120KB RAM, ~500KB–1.5MB flash. Tidak perlu PSRAM.
+- **Sistem Skill Event-Driven** — Kontrol GPIO, ADC, PWM, I2C, SPI, UART via JSON tool calling.
+- **Integrasi AI/LLM** — OpenAI, Gemini, OpenRouter, Ollama, atau API kompatibel OpenAI.
+- **WiFi Manager** — Konfigurasi SSID/password tanpa recompile firmware.
+- **Dukungan MQTT** — Publish, subscribe dengan wildcard matching dan dispatch aksi.
+- **Web Dashboard** — Chat dengan AI, status perangkat, konfigurasi WiFi/LLM/MQTT, daftar skill.
+- **Task Blink & Monitor** — Kedip GPIO non-blocking, pantau state pin dengan debounce.
+- **Penyimpanan NVS** — Mode GPIO, aturan monitor, dan subscription MQTT awet setelah reboot.
+- **Flasher Browser** — Upload firmware `.bin` via Web Serial API.
+- **Arsitektur Multi-Task** — FreeRTOS dual-core: Core 0 (loop, skill, mqtt), Core 1 (wifi, llm).
+
+### Struktur Proyek
+
+```
+ArduClaw/
+├── include/          # Header: hal.h, skill.h, dashboard.h
+├── src/              # Source: main.cpp, hal.cpp, skill.cpp
+├── lib/ArduClawLLM/  # Library klien LLM
+├── ArduClaw-flasher/ # Flasher firmware berbasis web
+├── test/
+├── skills.md         # Spesifikasi skill lengkap
+├── platformio.ini    # Konfigurasi PlatformIO
+└── build.ps1         # Script build & merge
 ```
 
-## Flash Usage
+### Board yang Didukung
 
-```text
-~500KB - 1.5MB
-```
+| Board        | Status       |
+| ------------ | ------------ |
+| ESP32 DevKit | ✅            |
+| ESP32-WROOM  | ✅            |
+| ESP32-C3     | ✅            |
+| ESP32-S2     | ⚠️           |
+| ESP8266      | Eksperimental |
 
----
+### Mulai Cepat
 
-# 🎨 UI Concept
+1. Install [PlatformIO](https://platformio.org) di VS Code.
+2. Buka folder proyek.
+3. Build: `pio run`
+4. Upload: `pio run --target upload`
+5. Buka Serial Monitor (115200 baud) dan kirim perintah JSON.
 
-ArduClaw menggunakan UI:
+### Build Firmware
 
-* modern minimal
-* dark mode
-* mobile friendly
-* lightweight
+Jalankan `build.ps1` untuk menggabungkan bootloader + partitions + firmware menjadi satu binary yang siap di-flash dari browser.
 
-Tanpa framework frontend berat.
+### Tech Stack
 
----
-
-# 🔐 Security Plans
-
-Planned:
-
-* encrypted config
-* HTTPS support
-* secure OTA
-* token authentication
-
----
-
-# 🛣️ Roadmap
-
-## v0.1
-
-* Event system
-* Rule engine
-* GPIO actions
-* Serial CLI
-
-## v0.2
-
-* WiFi manager
-* MQTT
-* Telegram integration
-
-## v0.3
-
-* Web flasher
-* OTA update
-* Dashboard
-
-## v0.4
-
-* AI/LLM integration
-* Visual automation
-* AI assistant
-
-## v1.0
-
-* Stable release
-* Full documentation
-* Plugin ecosystem
+- **Framework:** Arduino Framework di atas ESP-IDF / FreeRTOS
+- **Bahasa:** C++17
+- **IDE:** Visual Studio Code + PlatformIO
+- **Web UI:** HTML/CSS/JS murni (tanpa framework)
+- **Flasher:** Tailwind CSS, Web Serial API
 
 ---
 
-# 🔥 Positioning
-
-ArduClaw is:
-
-```text
-ESP-Claw inspired
-lightweight automation runtime
-for smaller ESP devices.
-```
+</details>
 
 ---
 
-# ❤️ Why ArduClaw?
+## 📜 License
 
-Because not every ESP32 project needs:
+MIT
 
-* local AI runtime
-* PSRAM besar
-* complex agent system
-
-Sometimes you just need:
-
-```text
-Simple Automation
-Fast Deployment
-Modern Setup
-Lightweight Runtime
-```
-
----
-
-# 📜 License
-
-MIT License
-
----
-
-# ❤️ ArduClaw
-
-Small Devices, Smart Automation.
+> **Small Devices, Smart Automation**
