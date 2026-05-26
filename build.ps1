@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$VERSION = "v02"
+$VERSION = "v07"
 
 Write-Host "=== Building ArduClaw $VERSION ===" -ForegroundColor Cyan
 pio run

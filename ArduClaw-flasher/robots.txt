@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://avisha.id/arduclaw/sitemap.xml

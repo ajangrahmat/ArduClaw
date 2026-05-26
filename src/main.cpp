@@ -1,81 +1,166 @@
 /**
- * ArduClaw v0.6 — Lightweight AI Automation Runtime for ESP32
+ * ArduClaw v0.7 — Multi-Task Architecture
  *
- * Features:
- *  - JSON serial protocol for WiFi + LLM configuration
- *  - WiFi credential storage in NVS (non-volatile storage)
- *  - LLM config storage in NVS (URL, API key, model)
- *  - HTTPS LLM API calls (WiFiClientSecure, insecure — skip cert verify)
- *  - Minimal web dashboard served on port 80
- *  - FreeRTOS WiFi task for background reconnect
+ * Task Layout:
+ *  ┌─────────────────────────────────────────────────────────┐
+ *  │ Core 0 (Protocol CPU)                                   │
+ *  │   loop_task  — serial handler + web server (16KB stack) │
+ *  │   skill_task — queue-based skill executor  ( 6KB stack) │
+ *  │   mqtt_task  — MQTT reconnect + loop       ( 6KB stack) │
+ *  ├─────────────────────────────────────────────────────────┤
+ *  │ Core 1 (App CPU)                                        │
+ *  │   wifi_task  — wifi reconnect loop         ( 8KB stack) │
+ *  │   llm_task   — per-request LLM call        (20KB stack) │
+ *  └─────────────────────────────────────────────────────────┘
+ *
+ * Komunikasi antar task pakai:
+ *  - QueueHandle_t  skillQueue   : main → skill_task
+ *  - QueueHandle_t  skillResult  : skill_task → main
+ *  - SemaphoreHandle_t llmDone   : llm_task → handleApiChat
+ *  - SemaphoreHandle_t wifiReady : wifi_task → siapapun yang tunggu
  *
  * Serial Commands (JSON, newline-terminated):
- *  { "c": "ws",       "s": "SSID", "p": "password" }   → save + connect WiFi
- *  { "c": "wst" }                                        → WiFi status
- *  { "c": "wr"  }                                        → clear WiFi config
- *  { "c": "rst" }                                        → restart ESP32
- *  { "c": "st"  }                                        → full status
- *  { "c": "llm_set",  "url":"...", "key":"...", "model":"..." } → save LLM config
- *  { "c": "llm_get"  }                                   → read LLM config
- *  { "c": "llm_test" }                                   → test LLM (start server)
- *  { "c": "llm_chat", "prompt":"..." }                   → send prompt to LLM
- *  { "c": "start" }                                      → start web server
- *
- * Dependencies (install via Arduino Library Manager or PlatformIO):
- *  - ArduinoJson  >= 7.x     (bblanchon/ArduinoJson)
- *  - ESP32 Arduino core      (espressif/arduino-esp32)
- *  - WebServer               (included in ESP32 core)
- *  - Preferences             (included in ESP32 core)
- *  - WiFiClientSecure        (included in ESP32 core)
- *
- * Build: PlatformIO or Arduino IDE with ESP32 board package.
- * Board: esp32dev (or any ESP32 variant, 4MB flash recommended)
+ *  { "c": "ws",       "s": "SSID", "p": "password" }
+ *  { "c": "wst" }  { "c": "wr" }  { "c": "rst" }  { "c": "st" }
+ *  { "c": "llm_set", "url":"...", "key":"...", "model":"..." }
+ *  { "c": "llm_get" }  { "c": "llm_test" }
+ *  { "c": "llm_chat", "prompt":"..." }
+ *  { "c": "start" }
  */
+
+// ── Loop task stack — HARUS sebelum Arduino.h di-include ─────────────────
+// Tanpa ini loop() jalan di stack default 8KB → crash saat handle LLM
+#ifndef ARDUINO_LOOP_STACK_SIZE
+  #define ARDUINO_LOOP_STACK_SIZE (16 * 1024)
+#endif
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <WiFiClient.h>
+#include <PubSubClient.h>
 #include <WebServer.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include "hal.h"
 #include "skill.h"
+#include "dashboard.h"
 
-// ── NVS namespace + keys ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// NVS
+// ─────────────────────────────────────────────────────────────────────────
+
 static Preferences prefs;
 static const char* PREF_NS  = "ac";
-
 static const char* KEY_SSID = "ssid";
 static const char* KEY_PASS = "pass";
 static const char* KEY_LURL = "lurl";
 static const char* KEY_LKEY = "lkey";
 static const char* KEY_LMOD = "lmod";
+static const char* KEY_MQH = "mqh";
+static const char* KEY_MQP = "mqp";
+static const char* KEY_MQU = "mqu";
+static const char* KEY_MQPS = "mqps";
+static const char* KEY_MQC = "mqc";
 
-// ── WiFi state ────────────────────────────────────────────────────────────
-static char   wifiSSID[64]  = "";
-static char   wifiPass[64]  = "";
-static bool   wifiConfigured = false;
-static bool   wifiNeedsRetry = false;
+// ─────────────────────────────────────────────────────────────────────────
+// WiFi state
+// ─────────────────────────────────────────────────────────────────────────
 
-// ── LLM state ─────────────────────────────────────────────────────────────
-static char   llmUrl[256]   = "https://ai.sumopod.com/v1/chat/completions";
-static char   llmKey[128]   = "";
-static char   llmModel[64]  = "gpt-4o-mini";
+static char wifiSSID[64]    = "";
+static char wifiPass[64]    = "";
+static bool wifiConfigured  = false;
+static bool wifiNeedsRetry  = false;
 
-// ── Shared JSON documents (avoid repeated allocation) ────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// LLM state
+// ─────────────────────────────────────────────────────────────────────────
+
+static char llmUrl[256]  = "https://ai.sumopod.com/v1/chat/completions";
+static char llmKey[128]  = "";
+static char llmModel[64] = "gpt-4o-mini";
+
+// ─────────────────────────────────────────────────────────────────────────
+// MQTT state
+// ─────────────────────────────────────────────────────────────────────────
+
+static char     mqttHost[64]     = "";
+static uint16_t mqttPort         = 1883;
+static char     mqttUser[32]     = "";
+static char     mqttPass[32]     = "";
+static char     mqttClientId[32] = "arduclaw";
+static bool     mqttConfigured   = false;
+static bool     mqttNeedsRetry   = false;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Shared JSON docs (hanya dipakai dari loop_task/serial handler)
+// ─────────────────────────────────────────────────────────────────────────
+
 static JsonDocument sendDoc;
 static JsonDocument recvDoc;
-static JsonDocument apiDoc;
 
-// ── Web server ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Web server
+// ─────────────────────────────────────────────────────────────────────────
+
 static WebServer server(80);
 static bool      serverStarted = false;
 
 // ─────────────────────────────────────────────────────────────────────────
-// JSON serial helpers
+// SkillQueue — kirim request dari loop_task ke skill_task
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Send { "ok": <ok>, "msg": "<msg>" } over Serial */
+#define SKILL_TOOL_LEN  32
+#define SKILL_ARGS_LEN 128
+
+struct SkillRequest {
+  char tool[SKILL_TOOL_LEN];
+  char argsJson[SKILL_ARGS_LEN];  // JSON string args, di-parse di skill_task
+};
+
+using skill::SkillResponse;
+
+static QueueHandle_t skillQueue    = nullptr;  // SkillRequest
+static QueueHandle_t skillRespQ    = nullptr;  // SkillResponse
+
+// ─────────────────────────────────────────────────────────────────────────
+// LLM Task state
+// ─────────────────────────────────────────────────────────────────────────
+
+struct LLMResult {
+  bool   success;
+  char   response[512];
+  int    skillsExecuted;
+  char   skillResultsJson[512];
+};
+
+struct LLMTaskParams {
+  char      prompt[256];
+  bool      done;
+  LLMResult result;
+};
+
+static LLMTaskParams     llmTaskParams;
+static SemaphoreHandle_t llmDone     = nullptr;
+static SemaphoreHandle_t wifiReady   = nullptr;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Strapping pin check
+// ─────────────────────────────────────────────────────────────────────────
+
+static const uint8_t STRAPPING_PINS[]     = {0, 2, 5, 12, 15};
+static const uint8_t STRAPPING_PIN_COUNT  = 5;
+
+static bool isStrappingPin(uint8_t pin) {
+  for (uint8_t i = 0; i < STRAPPING_PIN_COUNT; i++)
+    if (STRAPPING_PINS[i] == pin) return true;
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Serial JSON helpers (dipanggil hanya dari loop_task)
+// ─────────────────────────────────────────────────────────────────────────
+
 static void jsonResult(bool ok, const char* msg) {
   sendDoc.clear();
   sendDoc["ok"]  = ok;
@@ -84,22 +169,24 @@ static void jsonResult(bool ok, const char* msg) {
   Serial.println();
 }
 
-/** Send full WiFi + system status */
 static void jsonStatus() {
   sendDoc.clear();
-  sendDoc["ok"]        = true;
-  sendDoc["ssid"]      = wifiConfigured ? wifiSSID : "";
-  sendDoc["connected"] = (WiFi.status() == WL_CONNECTED);
-  if (WiFi.status() == WL_CONNECTED) {
-    sendDoc["ip"] = WiFi.localIP().toString();
+  sendDoc["ok"]             = true;
+  sendDoc["ssid"]           = wifiConfigured ? wifiSSID : "";
+  sendDoc["connected"]      = (WiFi.status() == WL_CONNECTED);
+  if (WiFi.status() == WL_CONNECTED) sendDoc["ip"] = WiFi.localIP().toString();
+  sendDoc["uptime"]         = millis() / 1000;
+  sendDoc["heap"]           = ESP.getFreeHeap();
+  sendDoc["min_heap"]       = ESP.getMinFreeHeap();
+  sendDoc["mqtt_configured"] = mqttConfigured;
+  if (mqttConfigured) {
+    sendDoc["mqtt_host"] = mqttHost;
+    sendDoc["mqtt_port"] = mqttPort;
   }
-  sendDoc["uptime"] = millis() / 1000;
-  sendDoc["heap"]   = ESP.getFreeHeap();
   serializeJson(sendDoc, Serial);
   Serial.println();
 }
 
-/** Send current LLM config (key hidden) */
 static void jsonLlmStatus() {
   sendDoc.clear();
   sendDoc["ok"]      = true;
@@ -110,56 +197,44 @@ static void jsonLlmStatus() {
   Serial.println();
 }
 
+static void jsonMqttStatus() {
+  sendDoc.clear();
+  sendDoc["ok"]            = true;
+  sendDoc["host"]          = mqttHost;
+  sendDoc["port"]          = mqttPort;
+  sendDoc["user"]          = mqttUser;
+  sendDoc["client_id"]     = mqttClientId;
+  sendDoc["configured"]    = mqttConfigured;
+  sendDoc["subs"]          = skill::mqttActiveSubCount();
+  sendDoc["sub_details"]   = skill::listMqttSubs();
+  serializeJson(sendDoc, Serial);
+  Serial.println();
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // NVS helpers
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * Write WiFi credentials to NVS. Returns false and reports error on failure.
- * Performs write + readback verify.
- */
 static bool saveWifiConfig() {
-  if (!prefs.begin(PREF_NS, false)) {
-    jsonResult(false, "nvs_write_open_fail");
-    return false;
-  }
-
+  if (!prefs.begin(PREF_NS, false)) { jsonResult(false, "nvs_write_open_fail"); return false; }
   size_t w1 = prefs.putString(KEY_SSID, wifiSSID);
   size_t w2 = prefs.putString(KEY_PASS, wifiPass);
   prefs.end();
-
-  if (w1 == 0 || w2 == 0) {
-    jsonResult(false, "nvs_write_fail");
-    return false;
-  }
-
-  // Readback verify
-  if (!prefs.begin(PREF_NS, true)) {
-    jsonResult(false, "nvs_verify_open_fail");
-    return false;
-  }
+  if (w1 == 0 || w2 == 0) { jsonResult(false, "nvs_write_fail"); return false; }
+  if (!prefs.begin(PREF_NS, true)) { jsonResult(false, "nvs_verify_open_fail"); return false; }
   String vs = prefs.getString(KEY_SSID, "");
   prefs.end();
-
-  if (vs != String(wifiSSID)) {
-    jsonResult(false, "nvs_verify_mismatch");
-    return false;
-  }
-
+  if (vs != String(wifiSSID)) { jsonResult(false, "nvs_verify_mismatch"); return false; }
   return true;
 }
 
-/** Read WiFi credentials from NVS on boot */
 static void loadWifiConfig() {
   wifiConfigured = false;
-  wifiSSID[0]    = '\0';
-  wifiPass[0]    = '\0';
-
+  wifiSSID[0] = '\0'; wifiPass[0] = '\0';
   prefs.begin(PREF_NS, true);
   String ssid = prefs.getString(KEY_SSID, "");
   String pass = prefs.getString(KEY_PASS, "");
   prefs.end();
-
   if (ssid.length() > 0) {
     ssid.toCharArray(wifiSSID, sizeof(wifiSSID));
     pass.toCharArray(wifiPass, sizeof(wifiPass));
@@ -167,34 +242,27 @@ static void loadWifiConfig() {
   }
 }
 
-/** Erase WiFi credentials from NVS */
 static void clearWifiConfig() {
   if (prefs.begin(PREF_NS, false)) {
-    prefs.remove(KEY_SSID);
-    prefs.remove(KEY_PASS);
+    prefs.remove(KEY_SSID); prefs.remove(KEY_PASS);
     prefs.end();
   }
-  wifiConfigured = false;
-  wifiNeedsRetry = false;
-  wifiSSID[0]    = '\0';
-  wifiPass[0]    = '\0';
+  wifiConfigured = false; wifiNeedsRetry = false;
+  wifiSSID[0] = '\0'; wifiPass[0] = '\0';
   jsonResult(true, "config_cleared");
 }
 
-/** Read LLM config from NVS */
 static void loadLlmConfig() {
   prefs.begin(PREF_NS, false);
   String url = prefs.getString(KEY_LURL, "");
   String key = prefs.getString(KEY_LKEY, "");
   String mod = prefs.getString(KEY_LMOD, "");
   prefs.end();
-
   if (url.length() > 0) url.toCharArray(llmUrl,   sizeof(llmUrl));
   if (key.length() > 0) key.toCharArray(llmKey,   sizeof(llmKey));
   if (mod.length() > 0) mod.toCharArray(llmModel, sizeof(llmModel));
 }
 
-/** Save LLM config to NVS */
 static void saveLlmConfig() {
   prefs.begin(PREF_NS, false);
   prefs.putString(KEY_LURL, llmUrl);
@@ -204,569 +272,1062 @@ static void saveLlmConfig() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// WiFi
+// MQTT NVS helpers
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Synchronous WiFi connect (called from WiFi task, not loop) */
-static void doWifiConnect() {
-  WiFi.disconnect(true);
-  vTaskDelay(pdMS_TO_TICKS(500));
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiSSID, wifiPass);
+static void saveMqttConfig() {
+  prefs.begin(PREF_NS, false);
+  prefs.putString(KEY_MQH, mqttHost);
+  prefs.putString(KEY_MQP, String(mqttPort));
+  prefs.putString(KEY_MQU, mqttUser);
+  prefs.putString(KEY_MQPS, mqttPass);
+  prefs.putString(KEY_MQC, mqttClientId);
+  prefs.end();
+}
 
-  bool ok = false;
-  for (int i = 0; i < 40; i++) {          // 40 × 500 ms = 20 s timeout
-    if (WiFi.status() == WL_CONNECTED) { ok = true; break; }
-    vTaskDelay(pdMS_TO_TICKS(500));
-  }
-
-  if (ok) {
-    jsonResult(true, "wifi_connected");
-  } else {
-    jsonResult(false, "wifi_failed");
+static void loadMqttConfig() {
+  mqttConfigured = false;
+  mqttHost[0] = '\0'; mqttUser[0] = '\0'; mqttPass[0] = '\0'; mqttClientId[0] = '\0';
+  mqttPort = 1883;
+  prefs.begin(PREF_NS, true);
+  String host = prefs.getString(KEY_MQH, "");
+  String port = prefs.getString(KEY_MQP, "1883");
+  String user = prefs.getString(KEY_MQU, "");
+  String pass = prefs.getString(KEY_MQPS, "");
+  String cid  = prefs.getString(KEY_MQC, "arduclaw");
+  prefs.end();
+  if (host.length() > 0) {
+    host.toCharArray(mqttHost, sizeof(mqttHost));
+    mqttPort = (uint16_t)port.toInt();
+    user.toCharArray(mqttUser, sizeof(mqttUser));
+    pass.toCharArray(mqttPass, sizeof(mqttPass));
+    cid.toCharArray(mqttClientId, sizeof(mqttClientId));
+    mqttConfigured = true;
   }
 }
 
-/** FreeRTOS task — handles connect + periodic reconnect */
+// ─────────────────────────────────────────────────────────────────────────
+// TASK 1: wifi_task — Core 1, 8KB
+// Tanggung jawab: connect, retry tiap 15 detik, beri sinyal wifiReady
+// ─────────────────────────────────────────────────────────────────────────
+
+static void startWebServer();  // forward decl
+
 static void wifiTask(void* param) {
+  static bool serverAutoStarted = false;
+
   while (true) {
+    // Reconnect jika perlu
     if (wifiConfigured && (wifiNeedsRetry || WiFi.status() != WL_CONNECTED)) {
       wifiNeedsRetry = false;
-      doWifiConnect();
+
+      WiFi.disconnect(true);
+      vTaskDelay(pdMS_TO_TICKS(500));
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(wifiSSID, wifiPass);
+
+      bool ok = false;
+      for (int i = 0; i < 40 && !ok; i++) {
+        if (WiFi.status() == WL_CONNECTED) ok = true;
+        else vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ok) {
+        Serial.printf("[WIFI] Connected: %s\n", WiFi.localIP().toString().c_str());
+        jsonResult(true, "wifi_connected");
+        xSemaphoreGive(wifiReady);  // sinyal ke siapapun yang tunggu WiFi
+      } else {
+        Serial.println(F("[WIFI] Connect failed, will retry"));
+      }
     }
+
+    // Auto-start web server sekali setelah WiFi + LLM key tersedia
+    if (!serverAutoStarted && WiFi.status() == WL_CONNECTED && strlen(llmKey) > 0) {
+      serverAutoStarted = true;
+      vTaskDelay(pdMS_TO_TICKS(500));
+      startWebServer();
+      Serial.printf("[WIFI] Web server started: http://%s\n",
+                    WiFi.localIP().toString().c_str());
+    }
+
+    // Monitor heap setiap siklus
+    Serial.printf("[MEM]  free=%u  min_ever=%u\n",
+                  ESP.getFreeHeap(), ESP.getMinFreeHeap());
+
     vTaskDelay(pdMS_TO_TICKS(15000));
   }
 }
 
+// ── MQTT reconnect callback — dipanggil dari skill_task ──
+static void requestMqttReconnect() {
+  mqttNeedsRetry = true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
-// Web server / dashboard
+// MQTT publish queue — aman dipanggil dari task lain (skill_task)
+// ─────────────────────────────────────────────────────────────────────────
+
+#define MQTT_PUB_QUEUE_SIZE 4
+
+struct MqttPubRequest {
+  char topic[64];
+  char payload[256];
+};
+
+static QueueHandle_t mqttPubQueue = nullptr;
+
+static bool queueMqttPublish(const char* topic, const char* payload) {
+  if (!mqttPubQueue) return false;
+  MqttPubRequest req;
+  strncpy(req.topic, topic, sizeof(req.topic) - 1);
+  req.topic[sizeof(req.topic) - 1] = '\0';
+  strncpy(req.payload, payload, sizeof(req.payload) - 1);
+  req.payload[sizeof(req.payload) - 1] = '\0';
+  return xQueueSend(mqttPubQueue, &req, pdMS_TO_TICKS(100)) == pdTRUE;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TASK 2.5: mqtt_task — Core 0, 6KB
+// Tanggung jawab: konek ke MQTT broker, subscribe ulang, loop client,
+//                 proses publish queue, dispatch incoming messages
+// ─────────────────────────────────────────────────────────────────────────
+
+static void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  char topicStr[64];
+  strncpy(topicStr, topic, sizeof(topicStr) - 1);
+  topicStr[sizeof(topicStr) - 1] = '\0';
+
+  char payloadStr[256];
+  unsigned int len = length < sizeof(payloadStr) - 1 ? length : sizeof(payloadStr) - 1;
+  memcpy(payloadStr, payload, len);
+  payloadStr[len] = '\0';
+
+  skill::mqttOnMessage(topicStr, payloadStr);
+}
+
+// PubSubClient globals — local static, hanya diakses dari mqtt_task
+static WiFiClient   mqttWifiClient;
+static PubSubClient mqttPubClient(mqttWifiClient);
+
+static void mqttTask(void* param) {
+  (void)param;
+
+  while (true) {
+    if (!mqttConfigured || strlen(mqttHost) == 0) {
+      vTaskDelay(pdMS_TO_TICKS(5000));
+      continue;
+    }
+
+    // Tunggu WiFi sebelum connect MQTT
+    if (WiFi.status() != WL_CONNECTED) {
+      vTaskDelay(pdMS_TO_TICKS(3000));
+      continue;
+    }
+
+    if (mqttNeedsRetry) {
+      mqttNeedsRetry = false;
+      if (mqttPubClient.connected()) mqttPubClient.disconnect();
+    }
+
+    if (!mqttPubClient.connected()) {
+      mqttPubClient.setServer(mqttHost, mqttPort);
+      mqttPubClient.setCallback(mqttCallback);
+
+      Serial.printf("[MQTT] Connecting to %s:%u as %s\n",
+                    mqttHost, mqttPort, mqttClientId);
+
+      boolean ok = false;
+      if (strlen(mqttUser) > 0)
+        ok = mqttPubClient.connect(mqttClientId, mqttUser, mqttPass);
+      else
+        ok = mqttPubClient.connect(mqttClientId);
+
+      if (ok) {
+        Serial.printf("[MQTT] Connected to %s:%u\n", mqttHost, mqttPort);
+        // Built-in MQTT → GPIO: hello/10219201/test on/off → pin 27
+        if (mqttPubClient.subscribe("hello/10219201/test")) {
+          Serial.printf("[MQTT] Subscribed to hello/10219201/test\n");
+        } else {
+          Serial.printf("[MQTT] WARN: subscribe hello/10219201/test failed\n");
+        }
+        skill::mqttMarkAllUnsynced();
+        skill::mqttSyncSubs(
+          +[](const char* t) -> bool { return mqttPubClient.subscribe(t); },
+          +[](const char* t) -> bool { return mqttPubClient.unsubscribe(t); }
+        );
+      } else {
+        Serial.printf("[MQTT] Connect failed rc=%d. Retry in 15s\n", mqttPubClient.state());
+        vTaskDelay(pdMS_TO_TICKS(15000));
+        continue;
+      }
+    }
+
+    // Process publish queue
+    MqttPubRequest pubReq;
+    while (xQueueReceive(mqttPubQueue, &pubReq, 0) == pdTRUE) {
+      if (mqttPubClient.connected()) {
+        mqttPubClient.publish(pubReq.topic, pubReq.payload);
+        Serial.printf("[MQTT] Published: %s\n", pubReq.topic);
+      }
+    }
+
+    // Sync subscriptions (brokerSynced tracking)
+    skill::mqttSyncSubs(
+      +[](const char* t) -> bool { return mqttPubClient.subscribe(t); },
+      +[](const char* t) -> bool { return mqttPubClient.unsubscribe(t); }
+    );
+
+    mqttPubClient.loop();
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TASK 3: skill_task — Core 0, 6KB
+// Tanggung jawab: terima SkillRequest dari queue, eksekusi, kirim response
+// Dipisah ke Core 0 agar tidak bentrok dgn llm_task di Core 1
+// ─────────────────────────────────────────────────────────────────────────
+
+// Doc kecil khusus skill_task — tidak dipakai task lain
+static JsonDocument skillArgDoc;
+
+static void skillTask(void* param) {
+  SkillRequest  req;
+  SkillResponse resp;
+
+  while (true) {
+    // Block sampai ada request (portMAX_DELAY = tunggu selamanya)
+    if (xQueueReceive(skillQueue, &req, portMAX_DELAY) == pdTRUE) {
+      memset(&resp, 0, sizeof(resp));
+      strncpy(resp.tool, req.tool, sizeof(resp.tool) - 1);
+
+      Serial.printf("[SKILL_TASK] Executing: %s  args: %s\n",
+                    req.tool, req.argsJson);
+
+      // Cek strapping pin dari argsJson sebelum parse
+      // (cepat, tanpa parse JSON)
+      // Parse args
+      skillArgDoc.clear();
+      JsonObject args;
+
+      if (strlen(req.argsJson) > 2) {
+        DeserializationError err = deserializeJson(skillArgDoc, req.argsJson);
+        if (err) {
+          resp.success = false;
+          snprintf(resp.message, sizeof(resp.message),
+                   "Args JSON parse error: %s", err.c_str());
+          xQueueSend(skillRespQ, &resp, pdMS_TO_TICKS(1000));
+          continue;
+        }
+        args = skillArgDoc.as<JsonObject>();
+
+        // Strapping pin warning
+        if (args["pin"].is<int>()) {
+          uint8_t pin = args["pin"].as<uint8_t>();
+          if (isStrappingPin(pin)) {
+            Serial.printf("[WARN] Strapping pin GPIO %d! Gunakan 13,14,16-19,21,25-27,32,33\n", pin);
+          }
+        }
+      } else {
+        // Skill tanpa args (misal system.status)
+        skillArgDoc.clear();
+        args = skillArgDoc.to<JsonObject>();
+      }
+
+      skill::SkillResult result = skill::executeSkillByName(String(req.tool), args);
+
+      resp.success = result.success;
+      strncpy(resp.message, result.message.c_str(), sizeof(resp.message) - 1);
+
+      // Kirim response ke queue
+      if (xQueueSend(skillRespQ, &resp, pdMS_TO_TICKS(2000)) != pdTRUE) {
+        Serial.println(F("[SKILL_TASK] Response queue full!"));
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Helper: kirim skill ke skill_task dan tunggu hasilnya
+// Dipanggil dari llm_task (bukan loop_task), aman karena pakai queue
+// ─────────────────────────────────────────────────────────────────────────
+
+static bool dispatchSkill(const char* tool, const char* argsJson,
+                           SkillResponse& outResp,
+                           TickType_t timeout = pdMS_TO_TICKS(5000)) {
+  SkillRequest req;
+  memset(&req, 0, sizeof(req));
+  strncpy(req.tool,     tool,     sizeof(req.tool)     - 1);
+  strncpy(req.argsJson, argsJson, sizeof(req.argsJson) - 1);
+
+  if (xQueueSend(skillQueue, &req, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    outResp.success = false;
+    strncpy(outResp.message, "Skill queue full", sizeof(outResp.message) - 1);
+    return false;
+  }
+
+  TickType_t remaining = timeout;
+  while (remaining > 0) {
+    TickType_t t0 = xTaskGetTickCount();
+    if (xQueueReceive(skillRespQ, &outResp, remaining) != pdTRUE) {
+      outResp.success = false;
+      strncpy(outResp.message, "Skill timeout", sizeof(outResp.message) - 1);
+      return false;
+    }
+    if (strcmp(outResp.tool, req.tool) == 0) break;
+    TickType_t elapsed = xTaskGetTickCount() - t0;
+    remaining = (elapsed >= remaining) ? 0 : remaining - elapsed;
+  }
+
+  return outResp.success;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LLM Helpers
+// ─────────────────────────────────────────────────────────────────────────
+
+static String extractJsonFromResponse(const String& raw) {
+  int start = raw.indexOf('{');
+  if (start < 0) return "";
+  int end = raw.lastIndexOf('}');
+  if (end < start) return "";
+  return raw.substring(start, end + 1);
+}
+
+// Doc khusus llm_task — tidak dipakai task lain
+// HANYA satu doc, tidak ada doc kedua untuk content
+static JsonDocument llmApiDoc;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Struct untuk satu skill yang sudah di-extract dari LLM content.
+// Disimpan sebagai plain char[] — tidak ada pointer ke JsonDocument
+// sehingga aman di-pass antar scope / task.
+// ─────────────────────────────────────────────────────────────────────────
+
+struct ExtractedSkill {
+  char tool[SKILL_TOOL_LEN];
+  char argsJson[SKILL_ARGS_LEN];
+};
+
+static const uint8_t MAX_EXTRACTED_SKILLS = 8;
+
+/**
+ * Parse content LLM → response text + array of ExtractedSkill.
+ *
+ * TIDAK ada JsonArray/JsonObject yang di-return atau disimpan lintas
+ * scope. Semua data di-copy ke plain char[] sebelum llmApiDoc.clear().
+ *
+ * @param content     String content dari LLM
+ * @param outSkills   Array output ExtractedSkill (stack-allocated oleh caller)
+ * @param outCount    Jumlah skill yang berhasil di-extract
+ * @param outResponse Buffer untuk response text
+ * @param respLen     Ukuran buffer outResponse
+ */
+static void parseLLMContent(const String& content,
+                             ExtractedSkill* outSkills,
+                             uint8_t&        outCount,
+                             char*           outResponse,
+                             size_t          respLen) {
+  outCount = 0;
+  strncpy(outResponse, content.c_str(), respLen - 1);
+  outResponse[respLen - 1] = '\0';
+
+  String toParse = content;
+  toParse.trim();
+
+  // Strip markdown fences
+  if (toParse.startsWith("```json") || toParse.startsWith("```")) {
+    int s = toParse.indexOf('\n');
+    int e = toParse.lastIndexOf("```");
+    if (s >= 0 && e > s) { toParse = toParse.substring(s + 1, e); toParse.trim(); }
+  }
+
+  if (toParse.length() == 0 || toParse[0] != '{') return;
+
+  // Parse ke llmApiDoc — REUSE doc yang sudah clear sebelumnya
+  // Caller HARUS sudah clear llmApiDoc sebelum panggil fungsi ini
+  DeserializationError err = deserializeJson(llmApiDoc, toParse);
+  if (err != DeserializationError::Ok) {
+    Serial.printf("[LLM] Content parse error: %s\n", err.c_str());
+    return;
+  }
+
+  // Salin response text ke buffer caller SEBELUM apapun yang bisa realloc doc
+  const char* resp = llmApiDoc["response"] | "";
+  if (strlen(resp) > 0) {
+    strncpy(outResponse, resp, respLen - 1);
+    outResponse[respLen - 1] = '\0';
+  }
+
+  // Extract skills — salin tool + args ke plain struct SEGERA
+  if (!llmApiDoc["skills"].is<JsonArray>()) return;
+
+  JsonArray skills = llmApiDoc["skills"].as<JsonArray>();
+  for (JsonObject skillObj : skills) {
+    if (outCount >= MAX_EXTRACTED_SKILLS) break;
+
+    const char* toolName = skillObj["tool"] | "";
+    if (strlen(toolName) == 0) continue;
+
+    ExtractedSkill& es = outSkills[outCount];
+    memset(&es, 0, sizeof(es));
+    strncpy(es.tool, toolName, sizeof(es.tool) - 1);
+
+    // Serialize args ke JSON string — data di-copy ke es.argsJson
+    if (skillObj["args"].is<JsonObject>()) {
+      serializeJson(skillObj["args"], es.argsJson, sizeof(es.argsJson));
+    } else {
+      strncpy(es.argsJson, "{}", sizeof(es.argsJson) - 1);
+    }
+
+    outCount++;
+    Serial.printf("[LLM] Extracted skill[%d]: %s  args=%s\n",
+                  outCount - 1, es.tool, es.argsJson);
+  }
+
+  // PENTING: setelah semua data di-copy ke plain struct,
+  // baru boleh clear doc. Tidak ada pointer ke doc yang tersisa.
+  llmApiDoc.clear();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TASK 3: llm_task — Core 1, 20KB, spawn per-request
+// Tanggung jawab: HTTP ke LLM API, parse response, dispatch skill via queue
+// ─────────────────────────────────────────────────────────────────────────
+
+static void llmCallTask(void* param) {
+  LLMTaskParams* p = (LLMTaskParams*)param;
+  LLMResult&     r = p->result;
+  memset(&r, 0, sizeof(r));
+  r.skillsExecuted    = 0;
+  strncpy(r.skillResultsJson, "[]", sizeof(r.skillResultsJson) - 1);
+
+  // ── Guard ──────────────────────────────────────────────────────────────
+  if (strlen(llmUrl) == 0 || strlen(llmKey) == 0) {
+    strncpy(r.response, "LLM not configured", sizeof(r.response) - 1);
+    r.success = false;
+    goto done;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    strncpy(r.response, "WiFi not connected", sizeof(r.response) - 1);
+    r.success = false;
+    goto done;
+  }
+  if (ESP.getFreeHeap() < 10000) {
+    snprintf(r.response, sizeof(r.response),
+             "Heap terlalu kecil: %u B", ESP.getFreeHeap());
+    r.success = false;
+    goto done;
+  }
+
+  {
+    // ── System prompt ─────────────────────────────────────────────────────
+    static const char SYSTEM_PROMPT[] PROGMEM =
+      "Kamu adalah ArduClaw, AI automation runtime untuk ESP32. "
+      "Saat diminta kontrol hardware, SELALU balas HANYA dengan JSON valid:\n"
+      "{\"response\": \"penjelasan singkat\", \"skills\": [{\"tool\": \"nama\", \"args\": {...}}]}\n"
+      "\nDaftar skills yang tersedia:\n"
+      "  gpio.write       {pin:int, value:bool}                 — tulis HIGH/LOW\n"
+      "  gpio.read        {pin:int}                             — baca nilai pin\n"
+      "  gpio.mode        {pin:int, mode:string}                — set mode pin (output/input/input_pullup)\n"
+      "  gpio.blink       {pin:int, on_ms:int, off_ms:int, count:int} — kedip N kali lalu berhenti\n"
+      "  gpio.blink_start {pin:int, on_ms:int, off_ms:int}     — mulai kedip terus-menerus (non-blocking)\n"
+      "  gpio.blink_stop  {pin:int}                            — hentikan kedip (tanpa pin = stop semua)\n"
+      "  gpio.monitor     {pin:int, trigger:string, action:string, action_args:obj, poll_ms:int, debounce_ms:int, once:bool} — pantau pin, jalankan action saat trigger terpenuhi\n"
+      "  gpio.monitor_stop {pin:int}                            — hentikan monitor (tanpa pin = stop semua)\n"
+      "  adc.read              {pin:int}                             — baca ADC (gunakan pin 32-39)\n"
+      "  system.status         {}                                    — status sistem\n"
+      "  system.clear_persist  {}                                    — hapus logika. Reboot → tidak ada logika sama sekali\n"
+      "  mqtt.publish       {topic:string, payload:string}           — kirim pesan ke MQTT broker\n"
+      "  mqtt.subscribe     {topic:string, action:string, action_args:obj} — subscribe topic, jalankan action saat pesan masuk. Gunakan {PAYLOAD} di action_args untuk menyisipkan isi pesan MQTT, contoh: {\"pin\":27,\"value\":\"{PAYLOAD}\"}\n"
+      "  mqtt.unsubscribe   {topic:string}                           — unsubscribe topic (kosongkan = hapus semua)\n"
+      "  system.reset_factory  {}                                    — factory reset. Reboot → benar-benar kosong, tidak ada logika\n"
+      "\nAturan pemilihan skill blink:\n"
+      "  - 'kedip X kali' → gpio.blink dengan count=X\n"
+      "  - 'kedip terus' / 'blink loop' / tanpa jumlah → gpio.blink_start\n"
+      "  - 'stop kedip' / 'matikan kedip' → gpio.blink_stop\n"
+      "  - on_ms dan off_ms default 500 jika tidak disebutkan\n"
+      "\nAturan gpio.monitor:\n"
+      "  trigger: 'low' (HIGH→LOW, button ditekan pull-up), 'high' (LOW→HIGH, button dilepas), 'change' (setiap perubahan)\n"
+      "  action: nama skill yang akan dijalankan saat trigger, action_args: argumen untuk skill tsb\n"
+      "  Contoh: button pull-up pin 26 → LED blink pin 27:\n"
+      "    {\"tool\":\"gpio.monitor\",\"args\":{\"pin\":26,\"trigger\":\"low\",\"action\":\"gpio.blink_start\",\"action_args\":{\"pin\":27,\"on_ms\":500,\"off_ms\":500}}}\n"
+      "    {\"tool\":\"gpio.monitor\",\"args\":{\"pin\":26,\"trigger\":\"high\",\"action\":\"gpio.blink_stop\",\"action_args\":{\"pin\":27}}}\n"
+      "\nContoh perintah user dan respons yang benar:\n"
+      "  - 'matikan semua logika' → gpio.monitor_stop {} lalu system.clear_persist {}. Reboot → semua mati total\n"
+      "  - 'reset ke factory default' → gpio.monitor_stop {} lalu system.reset_factory {}. Reboot → kosong total\n"
+      "  - 'LED pin 27 nyala' → gpio.write {pin:27, value:true}\n"
+      "  - 'baca suhu' → adc.read {pin:34}\n"
+      "  - 'mqtt subscribe hello/test → gpio.write pin 27 on/off' → mqtt.subscribe {topic:'hello/test', action:'gpio.write', action_args:{pin:27, value:'{PAYLOAD}'}}\n"
+      "  - 'terima data mqtt topik X on/off ke pin Y' → mqtt.subscribe {topic:'X', action:'gpio.write', action_args:{pin:Y, value:'{PAYLOAD}'}}\n"
+      "\nPin 0,2,5,12,15 adalah strapping pin (hanya peringatan, tetap bisa dipakai).\n"
+      "Balas HANYA JSON valid, tanpa markdown, tanpa teks di luar JSON.";
+
+    // ── Build request body ────────────────────────────────────────────────
+    llmApiDoc.clear();
+    llmApiDoc["model"]       = llmModel;
+    llmApiDoc["temperature"] = 0.3;
+    llmApiDoc["max_tokens"]  = 512;
+    JsonArray msgs = llmApiDoc["messages"].to<JsonArray>();
+    {
+      JsonObject sys    = msgs.add<JsonObject>();
+      sys["role"]       = "system";
+      sys["content"]    = (const char*)SYSTEM_PROMPT;
+      JsonObject user   = msgs.add<JsonObject>();
+      user["role"]      = "user";
+      user["content"]   = p->prompt;
+    }
+
+    String reqBody;
+    reqBody.reserve(800);
+    serializeJson(llmApiDoc, reqBody);
+    llmApiDoc.clear();  // bebaskan RAM sebelum buka socket
+
+    // ── Parse URL ─────────────────────────────────────────────────────────
+    char host[128] = "";
+    char path[256] = "/v1/chat/completions";
+    int  port      = 443;
+
+    const char* u = llmUrl;
+    if      (strncmp(u, "https://", 8) == 0) { u += 8; port = 443; }
+    else if (strncmp(u, "http://",  7) == 0) { u += 7; port = 80;  }
+
+    const char* sl = strchr(u, '/');
+    if (sl) {
+      size_t hlen = (size_t)(sl - u);
+      if (hlen >= sizeof(host)) hlen = sizeof(host) - 1;
+      strncpy(host, u, hlen); host[hlen] = '\0';
+      strncpy(path, sl, sizeof(path) - 1);
+    } else {
+      strncpy(host, u, sizeof(host) - 1);
+    }
+    char* colon = strchr(host, ':');
+    if (colon) { port = atoi(colon + 1); *colon = '\0'; }
+
+    // ── HTTPS connect ─────────────────────────────────────────────────────
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    if (!client.connect(host, port, 10000)) {
+      strncpy(r.response, "Gagal konek ke LLM server", sizeof(r.response) - 1);
+      r.success = false;
+      goto done;
+    }
+
+    client.printf("POST %s HTTP/1.1\r\n", path);
+    client.printf("Host: %s\r\n", host);
+    client.print("Content-Type: application/json\r\n");
+    client.printf("Authorization: Bearer %s\r\n", llmKey);
+    client.printf("Content-Length: %u\r\n", reqBody.length());
+    client.print("Accept-Encoding: identity\r\n");
+    client.print("Connection: close\r\n\r\n");
+    client.print(reqBody);
+    reqBody = "";  // bebaskan RAM
+
+    // ── Baca response ─────────────────────────────────────────────────────
+    String raw;
+    raw.reserve(2048);
+    unsigned long t0 = millis();
+    while (millis() - t0 < 20000) {
+      while (client.available()) { raw += (char)client.read(); t0 = millis(); }
+      if (!client.connected() && !client.available()) break;
+      vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    client.stop();
+
+    Serial.printf("[LLM] Raw len=%u  free_heap=%u\n",
+                  raw.length(), ESP.getFreeHeap());
+
+    // ── Parse API JSON ────────────────────────────────────────────────────
+    String body = extractJsonFromResponse(raw);
+    raw = "";  // bebaskan RAM
+
+    if (body.length() == 0) {
+      strncpy(r.response, "Tidak ada JSON dalam response", sizeof(r.response) - 1);
+      r.success = false;
+      goto done;
+    }
+
+    llmApiDoc.clear();
+    if (deserializeJson(llmApiDoc, body) != DeserializationError::Ok) {
+      strncpy(r.response, "Parse API response gagal", sizeof(r.response) - 1);
+      r.success = false;
+      goto done;
+    }
+    body = "";
+
+    if (llmApiDoc["error"].is<JsonObject>()) {
+      const char* em = llmApiDoc["error"]["message"] | "API error";
+      strncpy(r.response, em, sizeof(r.response) - 1);
+      r.success = false;
+      goto done;
+    }
+
+    if (!llmApiDoc["choices"].is<JsonArray>() ||
+        llmApiDoc["choices"].size() == 0) {
+      strncpy(r.response, "Tidak ada choices", sizeof(r.response) - 1);
+      r.success = false;
+      goto done;
+    }
+
+    const char* contentRaw = llmApiDoc["choices"][0]["message"]["content"];
+    if (!contentRaw) {
+      strncpy(r.response, "Content kosong", sizeof(r.response) - 1);
+      r.success = false;
+      goto done;
+    }
+
+    // Salin content ke String sebelum clear doc
+    String content = String(contentRaw);
+    llmApiDoc.clear();  // clear SEKARANG — tidak ada pointer ke doc lagi
+
+    Serial.printf("[LLM] Content (%u chars): %.200s\n",
+                  content.length(), content.c_str());
+
+    // ── Parse skills dari content ─────────────────────────────────────────
+    // ExtractedSkill disimpan di stack llmCallTask (20KB) — aman
+    ExtractedSkill extractedSkills[MAX_EXTRACTED_SKILLS];
+    uint8_t        skillCount = 0;
+    char           responseText[512] = "";
+
+    // llmApiDoc sudah clear — parseLLMContent akan reuse untuk parse content
+    parseLLMContent(content, extractedSkills, skillCount, responseText, sizeof(responseText));
+    content = "";  // bebaskan RAM String
+
+    strncpy(r.response, responseText, sizeof(r.response) - 1);
+
+    // ── Dispatch skills ke skill_task via queue ───────────────────────────
+    // extractedSkills sudah berisi plain char[] — tidak ada pointer ke JsonDoc
+    // Aman di-pass ke dispatchSkill lintas task
+    if (skillCount > 0) {
+      Serial.printf("[LLM] Dispatching %u skills via queue\n", skillCount);
+
+      // Build skill results JSON — pakai char buffer, tidak ada String concat di loop
+      char srJson[512];
+      int  srOff = 0;
+      srOff += snprintf(srJson + srOff, sizeof(srJson) - srOff, "[");
+
+      for (uint8_t i = 0; i < skillCount; i++) {
+        SkillResponse resp;
+        memset(&resp, 0, sizeof(resp));
+
+        dispatchSkill(extractedSkills[i].tool,
+                      extractedSkills[i].argsJson,
+                      resp,
+                      pdMS_TO_TICKS(5000));
+        r.skillsExecuted++;
+
+        Serial.printf("[LLM] Skill[%d] %s → %s: %s\n",
+                      i,
+                      extractedSkills[i].tool,
+                      resp.success ? "OK" : "FAIL",
+                      resp.message);
+
+        // Escape double-quote di message
+        char escapedMsg[128] = "";
+        const char* src = resp.message;
+        int ei = 0;
+        while (*src && ei < (int)sizeof(escapedMsg) - 2) {
+          if (*src == '"') { escapedMsg[ei++] = '\''; }
+          else             { escapedMsg[ei++] = *src; }
+          src++;
+        }
+        escapedMsg[ei] = '\0';
+
+        srOff += snprintf(srJson + srOff, sizeof(srJson) - srOff,
+                          "%s{\"tool\":\"%s\",\"success\":%s,\"message\":\"%s\"}",
+                          i > 0 ? "," : "",
+                          extractedSkills[i].tool,
+                          resp.success ? "true" : "false",
+                          escapedMsg);
+      }
+      snprintf(srJson + srOff, sizeof(srJson) - srOff, "]");
+      strncpy(r.skillResultsJson, srJson, sizeof(r.skillResultsJson) - 1);
+    }
+
+    r.success = true;
+  }
+
+done:
+  p->done = true;
+  xSemaphoreGive(llmDone);
+  vTaskDelete(nullptr);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Web dashboard HTML
 // ─────────────────────────────────────────────────────────────────────────
 
 static void handleRoot() {
-  String html = F(R"(<!DOCTYPE html><html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ArduClaw</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0f5;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
-.container{background:#fff;border-radius:22px;width:100%;max-width:600px;box-shadow:0 2px 6px rgba(0,0,0,0.04),0 12px 36px rgba(0,0,0,0.07);overflow:hidden;display:flex;flex-direction:column;height:90vh}
-.header{padding:20px;border-bottom:1px solid #f0f0f5;background:#fafafa}
-.header h1{font-size:20px;font-weight:800}
-.header h1 span{color:#FF6B00}
-.tabs{display:flex;border-bottom:1px solid #f0f0f5;background:#fafafa}
-.tab{flex:1;padding:12px;text-align:center;cursor:pointer;border-bottom:3px solid transparent;font-weight:600;color:#6e6e73;font-size:13px;transition:all 0.2s}
-.tab.active{color:#FF6B00;border-bottom-color:#FF6B00}
-.content{flex:1;overflow-y:auto;padding:16px;display:none}
-.content.active{display:flex;flex-direction:column}
-#dashboard .row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f8f8fb;border-radius:12px;margin-bottom:8px;font-size:14px}
-#dashboard .label{color:#6e6e73;font-size:12px;font-weight:700;text-transform:uppercase}
-#dashboard .val{font-weight:700;color:#1c1c1e}
-.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700}
-.ok{background:#e6f7e6;color:#2d8a2d}
-.warn{background:#fff3cd;color:#856404}
-#chat{display:flex;flex-direction:column;justify-content:space-between}
-#messages{flex:1;overflow-y:auto;margin-bottom:12px;display:flex;flex-direction:column}
-.msg{margin-bottom:12px;padding:10px 12px;border-radius:12px;max-width:85%;word-wrap:break-word;font-size:14px;line-height:1.4}
-.msg.user{align-self:flex-end;background:#FF6B00;color:white}
-.msg.bot{align-self:flex-start;background:#f0f0f5;color:#1c1c1e}
-.msg.error{align-self:flex-start;background:#ffe6e6;color:#c00}
-#input{display:flex;gap:8px}
-#chat-input{flex:1;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;outline:none}
-#chat-input:focus{border-color:#FF6B00}
-#send-btn{padding:10px 16px;background:#FF6B00;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px}
-#send-btn:hover{opacity:0.9}
-#send-btn:disabled{opacity:0.5;cursor:not-allowed}
-.footer{padding:12px;text-align:center;font-size:11px;color:#AEAEB2;border-top:1px solid #f0f0f5}
-</style>
-</head>
-<body>
-<div class="container">
-  <div class="header">
-    <h1>Ardu<span>Claw</span></h1>
-  </div>
-  
-  <div class="tabs">
-    <div class="tab active" data-tab="dashboard">Dashboard</div>
-    <div class="tab" data-tab="chat">Chat</div>
-  </div>
-  
-  <div id="dashboard" class="content active"></div>
-  <div id="chat" class="content">
-    <div id="messages"></div>
-    <div id="input">
-      <input id="chat-input" type="text" placeholder="Ask me anything..." autofocus>
-      <button id="send-btn">Send</button>
-    </div>
-  </div>
-  
-  <div class="footer">ArduClaw v0.6 &middot; <a href="https://sumopod.com" style="color:#AEAEB2">sumopod.com</a></div>
-</div>
-
-<script>
-const tabBtns = document.querySelectorAll('.tab');
-const contents = document.querySelectorAll('.content');
-
-tabBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const tab = btn.dataset.tab;
-    tabBtns.forEach(b => b.classList.remove('active'));
-    contents.forEach(c => c.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(tab).classList.add('active');
-    if(tab === 'dashboard') loadDashboard();
-  });
-});
-
-// Load dashboard
-async function loadDashboard() {
-  try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    
-    let html = '';
-    const row = (label, val) => `<div class="row"><div class="label">${label}</div><div class="val">${val}</div></div>`;
-    
-    html += row('Status', data.connected ? '<span class="badge ok">Connected</span>' : '<span class="badge warn">Disconnected</span>');
-    html += row('SSID', data.ssid || '(none)');
-    html += row('IP', data.ip || '—');
-    html += row('Uptime', (data.uptime || 0) + ' s');
-    html += row('Heap', (data.heap || 0) + ' B');
-    html += row('Skills', data.skill_count || 0);
-    
-    document.getElementById('dashboard').innerHTML = html;
-  } catch(e) {
-    console.error(e);
-  }
+  server.send_P(200, "text/html", CHAT_HTML);
 }
 
-// Chat
-const chatInput = document.getElementById('chat-input');
-const sendBtn = document.getElementById('send-btn');
-const messagesDiv = document.getElementById('messages');
-
-function addMessage(text, type) {
-  const msg = document.createElement('div');
-  msg.className = 'msg ' + type;
-  msg.textContent = text;
-  messagesDiv.appendChild(msg);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+static void handleDashboardPage() {
+  server.send_P(200, "text/html", DASHBOARD_HTML);
 }
 
-async function sendMessage() {
-  const text = chatInput.value.trim();
-  if(!text) return;
-  
-  chatInput.value = '';
-  sendBtn.disabled = true;
-  
-  addMessage(text, 'user');
-  
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({prompt: text})
-    });
-    
-    const data = await res.json();
-    if(data.ok) {
-      addMessage(data.response, 'bot');
-      if(data.skill_results) {
-        addMessage('Skills executed: ' + JSON.stringify(data.skill_results), 'bot');
-      }
-    } else {
-      addMessage('Error: ' + data.error, 'error');
-    }
-  } catch(e) {
-    addMessage('Network error: ' + e.message, 'error');
-  }
-  
-  sendBtn.disabled = false;
-  chatInput.focus();
+static void handleWifiPage() {
+  server.send_P(200, "text/html", WIFI_HTML);
 }
 
-sendBtn.addEventListener('click', sendMessage);
-chatInput.addEventListener('keypress', e => {
-  if(e.key === 'Enter') sendMessage();
-});
+static void handleLlmPage() {
+  server.send_P(200, "text/html", LLM_HTML);
+}
 
-loadDashboard();
-</script>
-</body></html>)");
+static void handleMqttPage() {
+  server.send_P(200, "text/html", MQTT_HTML);
+}
 
-  server.send(200, "text/html", html);
+static void handleSkillsPage() {
+  server.send_P(200, "text/html", SKILLS_HTML);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Skill API Handlers
+// API handlers (dipanggil dari loop_task)
 // ─────────────────────────────────────────────────────────────────────────
 
-/** GET /api/status - System status for dashboard */
 static void handleApiStatus() {
-  bool connected = (WiFi.status() == WL_CONNECTED);
-  
   sendDoc.clear();
-  sendDoc["ok"] = true;
-  sendDoc["connected"] = connected;
-  sendDoc["ssid"] = wifiConfigured ? String(wifiSSID) : "";
-  if (connected) {
-    sendDoc["ip"] = WiFi.localIP().toString();
-  }
-  sendDoc["uptime"] = millis() / 1000;
-  sendDoc["heap"] = ESP.getFreeHeap();
-  sendDoc["skill_count"] = 5;  // gpio.write, gpio.read, gpio.mode, adc.read, system.status
-  
-  String json;
-  serializeJson(sendDoc, json);
+  sendDoc["ok"]          = true;
+  sendDoc["connected"]   = (WiFi.status() == WL_CONNECTED);
+  sendDoc["ssid"]        = wifiConfigured ? String(wifiSSID) : "";
+  if (WiFi.status() == WL_CONNECTED) sendDoc["ip"] = WiFi.localIP().toString();
+  sendDoc["uptime"]      = millis() / 1000;
+  sendDoc["heap"]        = ESP.getFreeHeap();
+  sendDoc["min_heap"]    = ESP.getMinFreeHeap();
+  sendDoc["skill_count"] = skill::skillCount();
+  String json; serializeJson(sendDoc, json);
   server.send(200, "application/json", json);
 }
 
-/** GET /api/skills - List available skills */
 static void handleSkillsList() {
   sendDoc.clear();
-  sendDoc["ok"] = true;
+  sendDoc["ok"]     = true;
   sendDoc["skills"] = skill::listSkills();
-  
-  String json;
-  serializeJson(sendDoc, json);
+  String json; serializeJson(sendDoc, json);
   server.send(200, "application/json", json);
 }
 
-/** POST /api/skill/execute - Execute single skill */
 static void handleSkillExecute() {
   if (server.method() != HTTP_POST) {
-    sendDoc.clear();
-    sendDoc["ok"] = false;
-    sendDoc["error"] = "Method must be POST";
-    String json;
-    serializeJson(sendDoc, json);
-    server.send(405, "application/json", json);
+    server.send(405, "application/json", "{\"ok\":false,\"error\":\"POST only\"}");
     return;
   }
-  
-  // Parse request body
+
+  // Parse tool + args dari body
   String body = server.arg("plain");
   recvDoc.clear();
-  
-  DeserializationError error = deserializeJson(recvDoc, body);
-  if (error) {
-    sendDoc.clear();
-    sendDoc["ok"] = false;
-    sendDoc["error"] = "JSON parse error";
-    String json;
-    serializeJson(sendDoc, json);
-    server.send(400, "application/json", json);
+  if (deserializeJson(recvDoc, body)) {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"JSON error\"}");
     return;
   }
-  
-  // Execute skill
-  JsonObject skillObj = recvDoc.as<JsonObject>();
-  skill::SkillResult result = skill::executeSkill(skillObj);
-  
-  // Return result
-  sendDoc.clear();
-  sendDoc["ok"] = result.success;
-  sendDoc["message"] = result.message;
-  if (result.success && result.responseData.size() > 0) {
-    sendDoc["data"] = result.responseData;
+
+  const char* toolName = recvDoc["tool"] | "";
+  char argsStr[SKILL_ARGS_LEN] = "{}";
+  if (recvDoc["args"].is<JsonObject>()) {
+    serializeJson(recvDoc["args"], argsStr, sizeof(argsStr));
   }
-  
-  String json;
-  serializeJson(sendDoc, json);
-  server.send(result.success ? 200 : 400, "application/json", json);
+
+  SkillResponse resp;
+  dispatchSkill(toolName, argsStr, resp, pdMS_TO_TICKS(5000));
+
+  sendDoc.clear();
+  sendDoc["ok"]      = resp.success;
+  sendDoc["message"] = resp.message;
+  String json; serializeJson(sendDoc, json);
+  server.send(resp.success ? 200 : 400, "application/json", json);
 }
 
-/** POST /api/skill/chain - Execute multiple skills */
 static void handleSkillChain() {
   if (server.method() != HTTP_POST) {
-    sendDoc.clear();
-    sendDoc["ok"] = false;
-    sendDoc["error"] = "Method must be POST";
-    String json;
-    serializeJson(sendDoc, json);
-    server.send(405, "application/json", json);
+    server.send(405, "application/json", "{\"ok\":false,\"error\":\"POST only\"}");
     return;
   }
-  
-  // Parse request body
+
   String body = server.arg("plain");
   recvDoc.clear();
-  
-  DeserializationError error = deserializeJson(recvDoc, body);
-  if (error) {
-    sendDoc.clear();
-    sendDoc["ok"] = false;
-    sendDoc["error"] = "JSON parse error";
-    String json;
-    serializeJson(sendDoc, json);
-    server.send(400, "application/json", json);
+  if (deserializeJson(recvDoc, body) || !recvDoc.is<JsonArray>()) {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"JSON array expected\"}");
     return;
   }
-  
-  // Execute skill chain
-  JsonArray skillArray = recvDoc.as<JsonArray>();
-  
+
+  JsonArray arr    = recvDoc.as<JsonArray>();
+  bool allSuccess  = true;
+  String results   = "[";
+  bool first       = true;
+
+  for (JsonObject skillObj : arr) {
+    const char* toolName = skillObj["tool"] | "unknown";
+    char argsStr[SKILL_ARGS_LEN] = "{}";
+    if (skillObj["args"].is<JsonObject>()) {
+      serializeJson(skillObj["args"], argsStr, sizeof(argsStr));
+    }
+
+    SkillResponse resp;
+    bool ok = dispatchSkill(toolName, argsStr, resp, pdMS_TO_TICKS(5000));
+    if (!ok) allSuccess = false;
+
+    if (!first) results += ",";
+    results += "{\"tool\":\""; results += toolName;
+    results += "\",\"success\":"; results += resp.success ? "true" : "false";
+    results += ",\"message\":\""; results += resp.message; results += "\"}";
+    first = false;
+  }
+  results += "]";
+
   sendDoc.clear();
-  JsonArray results = sendDoc.createNestedArray("results");
-  
-  bool allSuccess = skill::executeSkillChain(skillArray, results);
-  
-  sendDoc["ok"] = allSuccess;
-  sendDoc["count"] = results.size();
-  
-  String json;
-  serializeJson(sendDoc, json);
+  sendDoc["ok"]    = allSuccess;
+  sendDoc["count"] = arr.size();
+  String json; serializeJson(sendDoc, json);
+  // Inject results array manually (sudah serialized)
+  json = json.substring(0, json.length() - 1) + ",\"results\":" + results + "}";
   server.send(allSuccess ? 200 : 207, "application/json", json);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// LLM Integration
-// ─────────────────────────────────────────────────────────────────────────
-
-/**
- * Call LLM API with prompt and extract skill calls
- * Returns LLM response text and executes any skill calls found
- */
-struct LLMResult {
-  bool success;
-  String response;
-  int skillsExecuted;
-};
-
-static LLMResult callLLMWithSkills(const String& userPrompt) {
-  LLMResult result{false, "LLM not configured", 0};
-  
-  // Check if LLM is configured
-  if (strlen(llmUrl) == 0 || strlen(llmKey) == 0) {
-    result.response = "LLM not configured";
-    return result;
-  }
-  
-  // Check WiFi
-  if (WiFi.status() != WL_CONNECTED) {
-    result.response = "WiFi not connected";
-    return result;
-  }
-  
-  // Build system prompt that instructs LLM to return JSON with skills
-  String systemPrompt = F("You are ArduClaw, an AI automation runtime for ESP32. ");
-  systemPrompt += F("When asked to control hardware, respond with a JSON object: ");
-  systemPrompt += F("{\"response\": \"...\", \"skills\": [...]}. ");
-  systemPrompt += F("Available skills: gpio.write, gpio.read, gpio.mode, adc.read, system.status. ");
-  systemPrompt += F("Skill format: {\"tool\": \"name\", \"args\": {...}}");
-  
-  // Build request JSON
-  apiDoc.clear();
-  apiDoc["model"] = llmModel;
-  
-  JsonArray messages = apiDoc.createNestedArray("messages");
-  
-  JsonObject sysMsg = messages.createNestedObject();
-  sysMsg["role"] = "system";
-  sysMsg["content"] = systemPrompt;
-  
-  JsonObject userMsg = messages.createNestedObject();
-  userMsg["role"] = "user";
-  userMsg["content"] = userPrompt;
-  
-  apiDoc["temperature"] = 0.7;
-  apiDoc["max_tokens"] = 1024;
-  
-  // Serialize request
-  String requestBody;
-  serializeJson(apiDoc, requestBody);
-  
-  // Make HTTPS request
-  WiFiClientSecure client;
-  client.setInsecure();  // Skip cert verification (for sumopod)
-  
-  if (!client.connect("ai.sumopod.com", 443)) {
-    result.response = "Failed to connect to LLM server";
-    return result;
-  }
-  
-  // Send HTTP request
-  String request = "POST /v1/chat/completions HTTP/1.1\r\n";
-  request += "Host: ai.sumopod.com\r\n";
-  request += "Content-Type: application/json\r\n";
-  request += "Authorization: Bearer " + String(llmKey) + "\r\n";
-  request += "Content-Length: " + String(requestBody.length()) + "\r\n";
-  request += "Connection: close\r\n\r\n";
-  
-  client.print(request);
-  client.print(requestBody);
-  
-  // Read response
-  String responseBody = "";
-  bool inBody = false;
-  
-  while (client.connected() || client.available()) {
-    if (client.available()) {
-      String line = client.readStringUntil('\n');
-      
-      if (!inBody) {
-        if (line == "\r") {
-          inBody = true;
-        }
-      } else {
-        responseBody += line;
-      }
-    }
-  }
-  
-  client.stop();
-  
-  // Parse response
-  recvDoc.clear();
-  DeserializationError error = deserializeJson(recvDoc, responseBody);
-  
-  if (error) {
-    result.response = "Failed to parse LLM response";
-    return result;
-  }
-  
-  // Extract message content
-  if (recvDoc.containsKey("choices") && recvDoc["choices"].size() > 0) {
-    JsonObject choice = recvDoc["choices"][0];
-    if (choice.containsKey("message")) {
-      String content = choice["message"]["content"];
-      
-      // Try to parse skill calls from response
-      // Look for JSON with "skills" array
-      int skillsIdx = content.indexOf("\"skills\"");
-      if (skillsIdx >= 0) {
-        int startIdx = content.lastIndexOf('{', skillsIdx);
-        int endIdx = content.indexOf('}', skillsIdx);
-        
-        if (startIdx >= 0 && endIdx > startIdx) {
-          String jsonStr = content.substring(startIdx, endIdx + 1);
-          apiDoc.clear();
-          
-          if (deserializeJson(apiDoc, jsonStr) == DeserializationError::Ok) {
-            result.response = apiDoc["response"].as<String>();
-            
-            if (apiDoc.containsKey("skills")) {
-              JsonArray skills = apiDoc["skills"];
-              JsonArray skillResults = sendDoc.createNestedArray("skill_results");
-              
-              for (JsonObject skillObj : skills) {
-                skill::SkillResult skillResult = skill::executeSkill(skillObj);
-                result.skillsExecuted++;
-                
-                JsonObject resObj = skillResults.createNestedObject();
-                resObj["tool"] = skillObj["tool"];
-                resObj["success"] = skillResult.success;
-                resObj["message"] = skillResult.message;
-              }
-            }
-            
-            result.success = true;
-            return result;
-          }
-        }
-      }
-      
-      // If no skills found, just return the response
-      result.response = content;
-      result.success = true;
-      return result;
-    }
-  }
-  
-  result.response = "Invalid LLM response format";
-  return result;
-}
-
-/** POST /api/chat - Chat with LLM and execute skills */
+// handleApiChat: spawn llm_task, tunggu hasilnya
 static void handleApiChat() {
   if (server.method() != HTTP_POST) {
-    sendDoc.clear();
-    sendDoc["ok"] = false;
-    sendDoc["error"] = "Method must be POST";
-    String json;
-    serializeJson(sendDoc, json);
-    server.send(405, "application/json", json);
+    server.send(405, "application/json", "{\"ok\":false,\"error\":\"POST only\"}");
     return;
   }
-  
-  // Parse request body
+
   String body = server.arg("plain");
   recvDoc.clear();
-  
-  DeserializationError error = deserializeJson(recvDoc, body);
-  if (error) {
-    sendDoc.clear();
-    sendDoc["ok"] = false;
-    sendDoc["error"] = "JSON parse error";
-    String json;
-    serializeJson(sendDoc, json);
-    server.send(400, "application/json", json);
+  if (deserializeJson(recvDoc, body)) {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"Bad JSON\"}");
     return;
   }
-  
-  // Get prompt
-  if (!recvDoc.containsKey("prompt")) {
-    sendDoc.clear();
-    sendDoc["ok"] = false;
-    sendDoc["error"] = "Missing prompt";
-    String json;
-    serializeJson(sendDoc, json);
-    server.send(400, "application/json", json);
+  const char* prompt = recvDoc["prompt"] | "";
+  if (strlen(prompt) == 0) {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"Missing prompt\"}");
     return;
   }
-  
-  const char* prompt = recvDoc["prompt"];
-  
-  // Call LLM
-  LLMResult llmResult = callLLMWithSkills(prompt);
-  
+
+  // Siapkan params
+  memset(&llmTaskParams, 0, sizeof(llmTaskParams));
+  strncpy(llmTaskParams.prompt, prompt, sizeof(llmTaskParams.prompt) - 1);
+  llmTaskParams.done = false;
+
+  if (llmDone == nullptr) llmDone = xSemaphoreCreateBinary();
+
+  Serial.printf("[CHAT] Prompt: %.100s  heap=%u\n",
+                llmTaskParams.prompt, ESP.getFreeHeap());
+
+  BaseType_t ok = xTaskCreatePinnedToCore(
+    llmCallTask, "llm_task",
+    20480,              // 20KB stack
+    &llmTaskParams,
+    2,                  // prioritas lebih tinggi dari wifi_task
+    nullptr,
+    1                   // Core 1 (App CPU)
+  );
+
+  if (ok != pdPASS) {
+    Serial.printf("[LLM] Task create fail! heap=%u\n", ESP.getFreeHeap());
+    server.send(500, "application/json",
+                "{\"ok\":false,\"error\":\"Heap tidak cukup untuk LLM task\"}");
+    return;
+  }
+
+  // Tunggu max 35 detik
+  if (xSemaphoreTake(llmDone, pdMS_TO_TICKS(35000)) != pdTRUE) {
+    server.send(500, "application/json", "{\"ok\":false,\"error\":\"LLM timeout\"}");
+    return;
+  }
+
+  LLMResult& res = llmTaskParams.result;
+
+  // Escape response string
+  String escaped = String(res.response);
+  escaped.replace("\\", "\\\\");
+  escaped.replace("\"", "\\\"");
+  escaped.replace("\n", "\\n");
+  escaped.replace("\r", "");
+
+  String respJson = "{\"ok\":";
+  respJson += res.success ? "true" : "false";
+  respJson += ",\"response\":\"";
+  respJson += escaped;
+  respJson += "\",\"skill_count\":";
+  respJson += String(res.skillsExecuted);
+  respJson += ",\"skill_results\":";
+  respJson += String(res.skillResultsJson);
+  respJson += "}";
+
+  server.send(res.success ? 200 : 400, "application/json", respJson);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// API: WiFi config
+// ─────────────────────────────────────────────────────────────────────────
+
+static void handleApiWifiGet() {
   sendDoc.clear();
-  sendDoc["ok"] = llmResult.success;
-  sendDoc["response"] = llmResult.response;
-  sendDoc["skill_count"] = llmResult.skillsExecuted;
-  
-  String json;
-  serializeJson(sendDoc, json);
-  server.send(llmResult.success ? 200 : 400, "application/json", json);
+  sendDoc["ok"]   = true;
+  sendDoc["ssid"] = wifiConfigured ? wifiSSID : "";
+  sendDoc["configured"] = wifiConfigured;
+  if (WiFi.status() == WL_CONNECTED) sendDoc["ip"] = WiFi.localIP().toString();
+  String json; serializeJson(sendDoc, json);
+  server.send(200, "application/json", json);
+}
+
+static void handleApiWifiSet() {
+  if (server.method() != HTTP_POST) { server.send(405, "application/json", "{\"ok\":false}"); return; }
+  String body = server.arg("plain");
+  recvDoc.clear();
+  if (deserializeJson(recvDoc, body)) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+  const char* s = recvDoc["ssid"] | "";
+  const char* p = recvDoc["pass"] | "";
+  if (strlen(s) == 0) { server.send(400, "application/json", "{\"ok\":false,\"error\":\"missing_ssid\"}"); return; }
+  strncpy(wifiSSID, s, sizeof(wifiSSID) - 1); wifiSSID[sizeof(wifiSSID)-1] = '\0';
+  strncpy(wifiPass, p, sizeof(wifiPass) - 1); wifiPass[sizeof(wifiPass)-1] = '\0';
+  saveWifiConfig(); wifiConfigured = true; wifiNeedsRetry = true;
+  server.send(200, "application/json", "{\"ok\":true,\"msg\":\"wifi_saved\"}");
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// API: LLM config
+// ─────────────────────────────────────────────────────────────────────────
+
+static void handleApiLlmGet() {
+  sendDoc.clear();
+  sendDoc["ok"]   = true;
+  sendDoc["url"]  = llmUrl;
+  sendDoc["model"] = llmModel;
+  sendDoc["has_key"] = (strlen(llmKey) > 0);
+  String json; serializeJson(sendDoc, json);
+  server.send(200, "application/json", json);
+}
+
+static void handleApiLlmSet() {
+  if (server.method() != HTTP_POST) { server.send(405, "application/json", "{\"ok\":false}"); return; }
+  String body = server.arg("plain");
+  recvDoc.clear();
+  if (deserializeJson(recvDoc, body)) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+  const char* url   = recvDoc["url"]   | "";
+  const char* key   = recvDoc["key"]   | "";
+  const char* model = recvDoc["model"] | "";
+  if (strlen(url)   > 0) strncpy(llmUrl,   url,   sizeof(llmUrl)   - 1);
+  if (strlen(key)   > 0) strncpy(llmKey,   key,   sizeof(llmKey)   - 1);
+  if (strlen(model) > 0) strncpy(llmModel, model, sizeof(llmModel) - 1);
+  saveLlmConfig();
+  server.send(200, "application/json", "{\"ok\":true,\"msg\":\"llm_saved\"}");
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// API: MQTT config
+// ─────────────────────────────────────────────────────────────────────────
+
+static void handleApiMqttGet() {
+  sendDoc.clear();
+  sendDoc["ok"]     = true;
+  sendDoc["host"]   = mqttHost;
+  sendDoc["port"]   = mqttPort;
+  sendDoc["user"]   = mqttUser;
+  sendDoc["client_id"] = mqttClientId;
+  sendDoc["configured"] = mqttConfigured;
+  String json; serializeJson(sendDoc, json);
+  server.send(200, "application/json", json);
+}
+
+static void handleApiMqttSet() {
+  if (server.method() != HTTP_POST) { server.send(405, "application/json", "{\"ok\":false}"); return; }
+  String body = server.arg("plain");
+  recvDoc.clear();
+  if (deserializeJson(recvDoc, body)) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+  const char* host = recvDoc["host"] | "";
+  const char* user = recvDoc["user"] | "";
+  const char* pass = recvDoc["pass"] | "";
+  const char* cid  = recvDoc["client_id"] | "";
+  int         port = recvDoc["port"] | 1883;
+  if (strlen(host) > 0) strncpy(mqttHost, host, sizeof(mqttHost) - 1);
+  if (strlen(user) > 0) strncpy(mqttUser, user, sizeof(mqttUser) - 1);
+  if (strlen(pass) > 0) strncpy(mqttPass, pass, sizeof(mqttPass) - 1);
+  if (strlen(cid)  > 0) strncpy(mqttClientId, cid, sizeof(mqttClientId) - 1);
+  if (port > 0) mqttPort = (uint16_t)port;
+  mqttConfigured = strlen(mqttHost) > 0;
+  if (mqttConfigured) saveMqttConfig();
+  server.send(200, "application/json", mqttConfigured ? "{\"ok\":true,\"msg\":\"mqtt_saved\"}" : "{\"ok\":true,\"msg\":\"mqtt_cleared\"}");
+}
+
+static void handleApiMqttSubs() {
+  server.send(200, "application/json",
+    "{\"ok\":true,\"subs\":" + skill::mqttSubsJson() + ",\"count\":" + String(skill::mqttActiveSubCount()) + "}");
+}
+
+static void handleApiMqttSubAdd() {
+  if (server.method() != HTTP_POST) { server.send(405, "application/json", "{\"ok\":false}"); return; }
+  String body = server.arg("plain");
+  recvDoc.clear();
+  if (deserializeJson(recvDoc, body)) { server.send(400, "application/json", "{\"ok\":false,\"error\":\"Bad JSON\"}"); return; }
+  const char* topic = recvDoc["topic"] | "";
+  const char* tool  = recvDoc["tool"] | "";
+  const char* args  = recvDoc["args"] | "{}";
+  if (strlen(topic) == 0) { server.send(400, "application/json", "{\"ok\":false,\"error\":\"Topik tidak boleh kosong\"}"); return; }
+  if (strlen(tool) == 0)  { server.send(400, "application/json", "{\"ok\":false,\"error\":\"Tool tidak boleh kosong\"}"); return; }
+  if (skill::mqttAddSub(topic, tool, args)) {
+    skill::persistMqttSubs();
+    requestMqttReconnect();
+    server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Subscribed: " + String(topic) + "\"}");
+  } else {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"Subs penuh (max 4)\"}");
+  }
+}
+
+static void handleApiMqttSubRemove() {
+  if (server.method() != HTTP_POST) { server.send(405, "application/json", "{\"ok\":false}"); return; }
+  String body = server.arg("plain");
+  recvDoc.clear();
+  if (deserializeJson(recvDoc, body)) { server.send(400, "application/json", "{\"ok\":false,\"error\":\"Bad JSON\"}"); return; }
+  const char* topic = recvDoc["topic"] | "";
+  bool ok = skill::mqttRemoveSub(strlen(topic) > 0 ? topic : nullptr);
+  if (ok) {
+    skill::persistMqttSubs();
+    requestMqttReconnect();
+    server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Removed\"}");
+  } else {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"No active subscription\"}");
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // Web Server Start
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Start web server (idempotent) */
 static void startWebServer() {
   if (serverStarted) return;
-  
-  server.on("/", handleRoot);
-  
-  // API routes
-  server.on("/api/status", HTTP_GET, handleApiStatus);
-  server.on("/api/skills", HTTP_GET, handleSkillsList);
+  server.on("/",           handleRoot);
+  server.on("/dashboard",  handleDashboardPage);
+  server.on("/wifi",       handleWifiPage);
+  server.on("/llm",        handleLlmPage);
+  server.on("/mqtt",       handleMqttPage);
+  server.on("/skills",     handleSkillsPage);
+  server.on("/api/status",        HTTP_GET,  handleApiStatus);
+  server.on("/api/skills",        HTTP_GET,  handleSkillsList);
   server.on("/api/skill/execute", HTTP_POST, handleSkillExecute);
-  server.on("/api/skill/chain", HTTP_POST, handleSkillChain);
-  server.on("/api/chat", HTTP_POST, handleApiChat);
-  
+  server.on("/api/skill/chain",   HTTP_POST, handleSkillChain);
+  server.on("/api/chat",          HTTP_POST, handleApiChat);
+  server.on("/api/wifi/get",      HTTP_GET,  handleApiWifiGet);
+  server.on("/api/wifi/set",      HTTP_POST, handleApiWifiSet);
+  server.on("/api/llm/get",       HTTP_GET,  handleApiLlmGet);
+  server.on("/api/llm/set",       HTTP_POST, handleApiLlmSet);
+  server.on("/api/mqtt/get",      HTTP_GET,  handleApiMqttGet);
+  server.on("/api/mqtt/set",      HTTP_POST, handleApiMqttSet);
+  server.on("/api/mqtt/subs",     HTTP_GET,  handleApiMqttSubs);
+  server.on("/api/mqtt/subs/add", HTTP_POST, handleApiMqttSubAdd);
+  server.on("/api/mqtt/subs/remove", HTTP_POST, handleApiMqttSubRemove);
   server.begin();
   serverStarted = true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// LLM
+// LLM serial commands
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * Test LLM config: ensures WiFi + API key are set, starts web server,
- * then reports OK with IP so the flasher UI shows the success card.
- */
 static void llmTest() {
   if (WiFi.status() != WL_CONNECTED) { jsonResult(false, "wifi_not_connected"); return; }
   if (strlen(llmKey) == 0)           { jsonResult(false, "api_key_missing");    return; }
-
   startWebServer();
-
   sendDoc.clear();
   sendDoc["ok"]  = true;
   sendDoc["msg"] = "llm_ok";
@@ -775,199 +1336,81 @@ static void llmTest() {
   Serial.println();
 }
 
-/**
- * Send a prompt to the configured LLM API and reply over Serial.
- * Uses raw HTTPS with WiFiClientSecure (cert verification disabled).
- */
 static void llmChat(const char* prompt) {
-  if (!prompt || strlen(prompt) == 0)    { jsonResult(false, "prompt_empty");      return; }
-  if (WiFi.status() != WL_CONNECTED)    { jsonResult(false, "wifi_not_connected"); return; }
-  if (strlen(llmKey) == 0)              { jsonResult(false, "api_key_missing");    return; }
+  if (!prompt || strlen(prompt) == 0) { jsonResult(false, "prompt_empty");       return; }
+  if (WiFi.status() != WL_CONNECTED)  { jsonResult(false, "wifi_not_connected"); return; }
+  if (strlen(llmKey) == 0)            { jsonResult(false, "api_key_missing");    return; }
 
-  jsonResult(true, "llm_wait");   // immediate ack
+  jsonResult(true, "llm_wait");
 
-  // ── Parse URL → host : port / path ──────────────────────────────────
-  char host[128] = "";
-  char path[256] = "";
-  int  port      = 443;
+  memset(&llmTaskParams, 0, sizeof(llmTaskParams));
+  strncpy(llmTaskParams.prompt, prompt, sizeof(llmTaskParams.prompt) - 1);
+  llmTaskParams.done = false;
 
-  const char* u = llmUrl;
-  if (strncmp(u, "https://", 8) == 0)      { u += 8; port = 443; }
-  else if (strncmp(u, "http://", 7) == 0)  { u += 7; port = 80;  }
+  if (llmDone == nullptr) llmDone = xSemaphoreCreateBinary();
 
-  const char* slash = strchr(u, '/');
-  if (slash) {
-    size_t hlen = (size_t)(slash - u);
-    if (hlen >= sizeof(host)) hlen = sizeof(host) - 1;
-    strncpy(host, u, hlen);
-    host[hlen] = '\0';
-    strncpy(path, slash, sizeof(path) - 1);
-  } else {
-    strncpy(host, u, sizeof(host) - 1);
-    strncpy(path, "/v1/chat/completions", sizeof(path) - 1);
+  BaseType_t ok = xTaskCreatePinnedToCore(
+    llmCallTask, "llm_task_s", 20480,
+    &llmTaskParams, 2, nullptr, 1
+  );
+  if (ok != pdPASS) { jsonResult(false, "heap_insufficient"); return; }
+
+  if (xSemaphoreTake(llmDone, pdMS_TO_TICKS(35000)) != pdTRUE) {
+    jsonResult(false, "llm_timeout"); return;
   }
 
-  // Strip port from host if present
-  char* colon = strchr(host, ':');
-  if (colon) {
-    port = atoi(colon + 1);
-    *colon = '\0';
-  }
-
-  // ── Build JSON request body ──────────────────────────────────────────
-  apiDoc.clear();
-  apiDoc["model"] = llmModel;
-  JsonArray msgs = apiDoc["messages"].to<JsonArray>();
-  JsonObject msg = msgs.add<JsonObject>();
-  msg["role"]    = "user";
-  msg["content"] = prompt;
-  apiDoc["max_tokens"]  = 512;
-  apiDoc["temperature"] = 0.7;
-
-  String reqBody;
-  serializeJson(apiDoc, reqBody);
-
-  // ── HTTPS request ────────────────────────────────────────────────────
-  WiFiClientSecure client;
-  client.setInsecure();   // skip certificate validation (fine for custom endpoints)
-
-  if (!client.connect(host, port, /*timeout ms=*/8000)) {
-    jsonResult(false, "llm_connect_fail");
-    return;
-  }
-
-  // Send HTTP/1.1 request
-  client.print("POST ");   client.print(path);   client.println(" HTTP/1.1");
-  client.print("Host: ");  client.println(host);
-  client.println("Content-Type: application/json");
-  client.print("Authorization: Bearer "); client.println(llmKey);
-  client.print("Content-Length: "); client.println(reqBody.length());
-  client.println("Connection: close");
-  client.println();
-  client.print(reqBody);
-
-  // ── Read response (with timeout) ─────────────────────────────────────
-  String raw;
-  raw.reserve(2048);
-  unsigned long t0 = millis();
-  while (millis() - t0 < 15000) {
-    if (client.available()) {
-      raw += (char)client.read();
-    } else {
-      if (raw.length() > 0 && !client.connected()) break;
-      delay(5);
-    }
-  }
-  client.stop();
-
-  // ── Find JSON body (after \r\n\r\n) ─────────────────────────────────
-  int bodyStart = raw.indexOf("\r\n\r\n");
-  if (bodyStart < 0) { jsonResult(false, "llm_bad_response"); return; }
-  String body = raw.substring(bodyStart + 4);
-
-  // Handle chunked transfer encoding (strip chunk size lines)
-  // Simple heuristic: if body starts with a hex digit, skip first line
-  if (body.length() > 0 && isxdigit((unsigned char)body[0])) {
-    int nl = body.indexOf('\n');
-    if (nl >= 0) body = body.substring(nl + 1);
-  }
-
-  // ── Parse response JSON ──────────────────────────────────────────────
-  apiDoc.clear();
-  DeserializationError err = deserializeJson(apiDoc, body);
-  if (err) {
-    sendDoc.clear();
-    sendDoc["ok"]  = false;
-    sendDoc["msg"] = "llm_parse_fail";
-    sendDoc["raw"] = body.substring(0, 200);
-    serializeJson(sendDoc, Serial);
-    Serial.println();
-    return;
-  }
-
-  const char* content = apiDoc["choices"][0]["message"]["content"];
-  if (!content) {
-    const char* errMsg = apiDoc["error"]["message"];
-    jsonResult(false, errMsg ? errMsg : "llm_no_response");
-    return;
-  }
-
+  LLMResult& res = llmTaskParams.result;
   sendDoc.clear();
-  sendDoc["ok"]    = true;
-  sendDoc["msg"]   = "llm_ok";
-  sendDoc["reply"] = content;
+  sendDoc["ok"]          = res.success;
+  sendDoc["msg"]         = res.success ? "llm_ok" : "llm_error";
+  sendDoc["reply"]       = res.response;
+  sendDoc["skill_count"] = res.skillsExecuted;
   serializeJson(sendDoc, Serial);
   Serial.println();
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Serial JSON command handler
+// Serial command handler (TASK 4: loop_task, Core 0)
 // ─────────────────────────────────────────────────────────────────────────
 
 static void handleSerial() {
   static String buf;
-
   while (Serial.available()) {
     char c = (char)Serial.read();
-    if (c == '\r') continue;   // ignore CR
-
+    if (c == '\r') continue;
     if (c == '\n') {
       buf.trim();
+      if (buf.length() == 0) { buf = ""; jsonResult(true, "ready"); continue; }
 
-      // Empty line → handshake ping
-      if (buf.length() == 0) {
-        buf = "";
-        jsonResult(true, "ready");
-        continue;
-      }
-
-      // Parse JSON command
       recvDoc.clear();
-      DeserializationError err = deserializeJson(recvDoc, buf);
-      if (err) {
-        jsonResult(false, "bad_json");
-        buf = "";
-        continue;
-      }
+      if (deserializeJson(recvDoc, buf)) { jsonResult(false, "bad_json"); buf = ""; continue; }
 
       const char* cmd = recvDoc["c"] | "";
 
-      // ── ws: WiFi set + connect ──────────────────────────────────────
       if (strcmp(cmd, "ws") == 0) {
         const char* s = recvDoc["s"] | "";
         const char* p = recvDoc["p"] | "";
-        if (strlen(s) == 0) {
-          jsonResult(false, "missing_ssid");
-        } else {
-          strncpy(wifiSSID, s, sizeof(wifiSSID) - 1);  wifiSSID[sizeof(wifiSSID)-1] = '\0';
-          strncpy(wifiPass, p, sizeof(wifiPass) - 1);  wifiPass[sizeof(wifiPass)-1] = '\0';
-          if (saveWifiConfig()) {
-            wifiConfigured = true;
-            wifiNeedsRetry = true;
-            jsonResult(true, "wifi_saved_connecting");
-          }
+        if (strlen(s) == 0) { jsonResult(false, "missing_ssid"); }
+        else {
+          strncpy(wifiSSID, s, sizeof(wifiSSID) - 1); wifiSSID[sizeof(wifiSSID)-1] = '\0';
+          strncpy(wifiPass, p, sizeof(wifiPass) - 1); wifiPass[sizeof(wifiPass)-1] = '\0';
+          if (saveWifiConfig()) { wifiConfigured = true; wifiNeedsRetry = true;
+            jsonResult(true, "wifi_saved_connecting"); }
         }
       }
-      // ── wst / st: status ────────────────────────────────────────────
-      else if (strcmp(cmd, "wst") == 0 || strcmp(cmd, "st") == 0) {
-        jsonStatus();
+      else if (strcmp(cmd, "wst") == 0 || strcmp(cmd, "st") == 0) { jsonStatus(); }
+      else if (strcmp(cmd, "wr") == 0)  { clearWifiConfig(); WiFi.disconnect(true); }
+      else if (strcmp(cmd, "clr") == 0) {
+        skill::clearPersistentConfig();
+        jsonResult(true, "config_cleared_rebooting");
+        Serial.flush(); delay(200); ESP.restart();
       }
-      // ── wr: WiFi reset ──────────────────────────────────────────────
-      else if (strcmp(cmd, "wr") == 0) {
-        clearWifiConfig();
-        WiFi.disconnect(true);
-      }
-      // ── rst: restart ────────────────────────────────────────────────
       else if (strcmp(cmd, "rst") == 0) {
-        jsonResult(true, "restarting");
-        Serial.flush();
-        delay(200);
-        ESP.restart();
+        jsonResult(true, "restarting"); Serial.flush(); delay(200); ESP.restart();
       }
-      // ── llm_set: save LLM config ────────────────────────────────────
       else if (strcmp(cmd, "llm_set") == 0) {
-        const char* url = recvDoc["url"] | "";
-        const char* key = recvDoc["key"] | "";
+        const char* url = recvDoc["url"]   | "";
+        const char* key = recvDoc["key"]   | "";
         const char* mod = recvDoc["model"] | "";
         if (strlen(url) > 0) strncpy(llmUrl,   url, sizeof(llmUrl)   - 1);
         if (strlen(key) > 0) strncpy(llmKey,   key, sizeof(llmKey)   - 1);
@@ -975,24 +1418,41 @@ static void handleSerial() {
         saveLlmConfig();
         jsonResult(true, "llm_saved");
       }
-      // ── llm_get: read LLM config ────────────────────────────────────
-      else if (strcmp(cmd, "llm_get") == 0) {
-        jsonLlmStatus();
+      else if (strcmp(cmd, "llm_get") == 0)  { jsonLlmStatus(); }
+      else if (strcmp(cmd, "llm_test") == 0) { llmTest(); }
+      else if (strcmp(cmd, "mqtt_set") == 0) {
+        const char* host = recvDoc["host"] | "";
+        const char* user = recvDoc["user"] | "";
+        const char* pass = recvDoc["pass"] | "";
+        const char* cid  = recvDoc["client_id"] | "";
+        int         port = recvDoc["port"] | 1883;
+        if (strlen(host) > 0) strncpy(mqttHost, host, sizeof(mqttHost) - 1);
+        if (strlen(user) > 0) strncpy(mqttUser, user, sizeof(mqttUser) - 1);
+        if (strlen(pass) > 0) strncpy(mqttPass, pass, sizeof(mqttPass) - 1);
+        if (strlen(cid)  > 0) strncpy(mqttClientId, cid, sizeof(mqttClientId) - 1);
+        if (port > 0) mqttPort = (uint16_t)port;
+        mqttConfigured = strlen(mqttHost) > 0;
+        if (mqttConfigured) saveMqttConfig();
+        jsonResult(true, mqttConfigured ? "mqtt_saved" : "mqtt_cleared");
       }
-      // ── llm_test: verify config + start server ──────────────────────
-      else if (strcmp(cmd, "llm_test") == 0) {
-        llmTest();
+      else if (strcmp(cmd, "mqtt_get") == 0)  { jsonMqttStatus(); }
+      else if (strcmp(cmd, "mqtt_test") == 0) {
+        if (WiFi.status() != WL_CONNECTED) { jsonResult(false, "wifi_not_connected"); }
+        else if (!mqttConfigured)          { jsonResult(false, "mqtt_not_configured"); }
+        else {
+          startWebServer();
+          sendDoc.clear();
+          sendDoc["ok"]  = true;
+          sendDoc["msg"] = "mqtt_ok";
+          sendDoc["ip"]  = WiFi.localIP().toString();
+          serializeJson(sendDoc, Serial);
+          Serial.println();
+        }
       }
-      // ── llm_chat: send prompt ────────────────────────────────────────
-      else if (strcmp(cmd, "llm_chat") == 0) {
-        const char* prompt = recvDoc["prompt"] | "";
-        llmChat(prompt);
-      }
-      // ── start: start web server ──────────────────────────────────────
+      else if (strcmp(cmd, "llm_chat") == 0) { llmChat(recvDoc["prompt"] | ""); }
       else if (strcmp(cmd, "start") == 0) {
-        if (WiFi.status() != WL_CONNECTED) {
-          jsonResult(false, "wifi_not_connected");
-        } else {
+        if (WiFi.status() != WL_CONNECTED) { jsonResult(false, "wifi_not_connected"); }
+        else {
           startWebServer();
           sendDoc.clear();
           sendDoc["ok"]  = true;
@@ -1002,64 +1462,113 @@ static void handleSerial() {
           Serial.println();
         }
       }
-      // ── unknown ──────────────────────────────────────────────────────
-      else {
-        jsonResult(false, "unknown_cmd");
-      }
+      else { jsonResult(false, "unknown_cmd"); }
 
       buf = "";
     } else {
-      // Buffer limit — prevent runaway memory use
       if (buf.length() < 512) buf += c;
     }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Setup / loop
+// Setup
 // ─────────────────────────────────────────────────────────────────────────
 
 void setup() {
   Serial.begin(115200);
-  delay(800);   // let USB-UART settle
+  delay(800);
 
-  // Initialize HAL (Hardware Abstraction Layer)
   hal::init();
-  
-  // Initialize Skill System
+  pinMode(27, OUTPUT);
+  digitalWrite(27, LOW);
   skill::init();
 
-  Serial.println();
-  Serial.println(F("========================="));
-  Serial.println(F("  ArduClaw v0.6 booting  "));
-  Serial.println(F("========================="));
+  // Buat queue & semaphore sebelum task apapun dijalankan
+  skillQueue = xQueueCreate(4, sizeof(SkillRequest));   // max 4 request pending
+  skillRespQ = xQueueCreate(4, sizeof(SkillResponse));  // max 4 response pending
+  llmDone    = xSemaphoreCreateBinary();
+  wifiReady  = xSemaphoreCreateBinary();
 
-  // Load configs from NVS
+  if (!skillQueue || !skillRespQ || !llmDone || !wifiReady) {
+    Serial.println(F("[BOOT] FATAL: Queue/semaphore create failed!"));
+    while (true) delay(1000);
+  }
+
+  Serial.println();
+  Serial.println(F("============================="));
+  Serial.println(F("  ArduClaw v0.7 Multi-Task  "));
+  Serial.println(F("============================="));
+  Serial.printf (  "  Free heap : %u B\n", ESP.getFreeHeap());
+  Serial.println(F("  Tasks:"));
+  Serial.println(F("    Core0: loop_task(16K) + skill_task(6K) + mqtt_task(6K)"));
+  Serial.println(F("    Core1: wifi_task(8K)  + llm_task(20K, per-req)"));
+  Serial.println(F("============================="));
+
   loadWifiConfig();
   loadLlmConfig();
+  loadMqttConfig();
 
-  // Report boot state
+  // ── Generate random MQTT client ID ──
+  if (!mqttConfigured || strlen(mqttClientId) == 0) {
+    snprintf(mqttClientId, sizeof(mqttClientId), "arduclaw-%06x",
+             (unsigned long)esp_random() & 0xFFFFFF);
+  }
+
+  // ── MQTT publish queue ──
+  mqttPubQueue = xQueueCreate(MQTT_PUB_QUEUE_SIZE, sizeof(MqttPubRequest));
+
+  // ── Set MQTT callbacks (dipanggil dari skill_task) ──
+  skill::setMqttPublishFn(queueMqttPublish);
+  skill::setMqttReconnectFn(requestMqttReconnect);
+
+  // ── TASK: wifi_task — Core 1, 8KB ──
+  xTaskCreatePinnedToCore(
+    wifiTask, "wifi_task",
+    8192, nullptr, 1, nullptr, 1
+  );
+
+  // ── TASK: skill_task — Core 0, 6KB ──
+  // Dipin ke Core 0 agar tidak bersaing CPU dengan llm_task di Core 1
+  xTaskCreatePinnedToCore(
+    skillTask, "skill_task",
+    6144, nullptr, 3,  // prioritas 3 = lebih tinggi dari loop, agar skill cepat
+    nullptr, 0
+  );
+
+  // ── TASK: mqtt_task — Core 0, 6KB ──
+  xTaskCreatePinnedToCore(
+    mqttTask, "mqtt_task",
+    6144, nullptr, 1, nullptr, 0
+  );
+
+  // ── Set dispatcher — WAJIB agar monitor system bisa dispatch action ──
+  skill::setDispatcher(dispatchSkill);
+
+  // ── Restore persistent config dari NVS ────────────────────────────
+  // GPIO modes + monitor rules yang disimpan via chat akan dipulihkan
+  // First boot = kosong, tidak ada logika default
+  skill::loadPersistentConfig();
+
+  if (mqttConfigured) {
+    Serial.printf("[BOOT] MQTT configured: %s:%u as %s\n",
+                  mqttHost, mqttPort, mqttClientId);
+  }
+
   if (wifiConfigured) {
     wifiNeedsRetry = true;
     jsonResult(true, "config_loaded");
   } else {
     jsonResult(true, "ready");
   }
-
-  // WiFi task on core 1 (loop runs on core 1 by default, so pin wifi to same)
-  xTaskCreatePinnedToCore(
-    wifiTask,
-    "wifi_task",
-    4096,     // stack size in bytes
-    NULL,     // parameter
-    1,        // priority
-    NULL,     // task handle
-    1         // core 1
-  );
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Loop (loop_task, Core 0, 16KB via ARDUINO_LOOP_STACK_SIZE)
+// ─────────────────────────────────────────────────────────────────────────
 
 void loop() {
   handleSerial();
-  server.handleClient();
-  vTaskDelay(pdMS_TO_TICKS(10));   // yield to RTOS scheduler
+  if (serverStarted) server.handleClient();
+  vTaskDelay(pdMS_TO_TICKS(10));
 }

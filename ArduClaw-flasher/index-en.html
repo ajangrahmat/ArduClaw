@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,12 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="icon" type="image/png" href="logo.png" />
-  <link rel="canonical" href="https://avisha.id/arduclaw/" />
-  <meta name="description" content="ArduClaw — AI Agent Runtime untuk board ESP32. Flash firmware, konfigurasi WiFi & LLM dari browser. Beta — support ESP32 DEV board." />
-  <meta property="og:title" content="ArduClaw — AI Agent Runtime untuk ESP32" />
-  <meta property="og:description" content="Flash firmware, konfigurasi WiFi & LLM dalam satu alat. Jalan di board ESP32 DEV paling populer." />
+  <link rel="canonical" href="https://avisha.id/arduclaw/index-en.html" />
+  <meta name="description" content="ArduClaw — AI Agent Runtime for ESP32. Flash firmware, configure WiFi &amp; LLM from browser. Beta — supports ESP32 DEV boards." />
+  <meta property="og:title" content="ArduClaw — AI Agent Runtime for ESP32" />
+  <meta property="og:description" content="Flash firmware, configure WiFi &amp; LLM in one tool. Runs on the most popular ESP32 DEV boards." />
   <meta property="og:image" content="https://avisha.id/arduclaw/maskot.webp" />
-  <meta property="og:url" content="https://avisha.id/arduclaw/" />
+  <meta property="og:url" content="https://avisha.id/arduclaw/index-en.html" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -29,43 +29,40 @@
 </head>
 <body class="bg-[#f5f5f7] min-h-screen font-nunito text-hitam antialiased overflow-x-hidden">
 
-  <!-- decorative blobs -->
+  <!-- blobs -->
   <div class="fixed w-[600px] h-[600px] rounded-full bg-redpd/5 blur-[100px] -top-[200px] -right-[150px] pointer-events-none z-0 anim-float"></div>
   <div class="fixed w-[400px] h-[400px] rounded-full bg-orpd/8 blur-[100px] bottom-[100px] -left-[150px] pointer-events-none z-0 anim-float" style="animation-delay:-5s"></div>
-
-  <!-- subtle grid -->
   <div class="fixed inset-0 pointer-events-none z-0" style="background-image:linear-gradient(rgba(243,29,28,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(243,29,28,0.03) 1px,transparent 1px);background-size:40px 40px"></div>
 
   <!-- navbar -->
   <nav class="relative z-30 flex items-center justify-center w-full px-4 md:px-8 py-4 bg-white/70 backdrop-blur-lg border-b border-abu/30 shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
     <div class="flex items-center justify-between w-full max-w-[1120px]">
-      <a href="index.html" class="flex items-center gap-3 no-underline shrink-0 group">
+      <a href="index-en.html" class="flex items-center gap-3 no-underline shrink-0 group">
         <img src="maskot.webp" alt="ArduClaw" class="h-11 w-auto drop-shadow-[0_2px_6px_rgba(243,29,28,0.12)] transition-transform duration-200 group-hover:scale-105" />
         <div class="flex flex-col leading-tight">
           <span class="text-[24px] font-extrabold tracking-tight text-hitam">Ardu<span class="text-redpd">Claw</span></span>
           <span class="text-[10px] font-medium text-abu tracking-[.03em] -mt-0.5">ArduMeka Claw AI Bot</span>
         </div>
       </a>
-      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors active:bg-redpd/20" style="-webkit-tap-highlight-color:transparent">
+      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" style="-webkit-tap-highlight-color:transparent">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <div class="hidden md:flex items-center gap-1 text-[15px] font-bold">
-        <a href="index.html" class="block px-4 py-1.5 rounded-lg bg-redpd/10 text-redpd">Home</a>
-        <a href="flash.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors duration-150">Flash Firmware</a>
-        <a href="docs.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors duration-150">Docs</a>
+        <a href="index-en.html" class="block px-4 py-1.5 rounded-lg bg-redpd/10 text-redpd">Home</a>
+        <a href="flash-en.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors duration-150">Flash Firmware</a>
+        <a href="docs-en.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors duration-150">Docs</a>
         <span class="w-px h-4 bg-abu/40 mx-1.5"></span>
-        <a href="index.html" class="block px-2 py-1 rounded-lg bg-redpd/10 text-redpd text-[13px] font-bold transition-colors">ID</a>
-        <a href="index-en.html" class="block px-2 py-1 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd text-[13px] font-bold transition-colors">EN</a>
+        <a href="index.html" class="block px-2 py-1 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd text-[13px] font-bold transition-colors">ID</a>
+        <a href="index-en.html" class="block px-2 py-1 rounded-lg bg-redpd/10 text-redpd text-[13px] font-bold transition-colors">EN</a>
       </div>
     </div>
-    <!-- mobile menu -->
     <div class="hidden md:hidden absolute top-full left-0 w-full bg-white/95 backdrop-blur-lg border-b border-abu/30 px-4 py-3 flex flex-col gap-1 text-[15px] font-bold shadow-lg z-40" id="navMenuMobile">
-      <a href="index.html" class="block px-4 py-2 rounded-lg bg-redpd/10 text-redpd">Home</a>
-      <a href="flash.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Flash Firmware</a>
-      <a href="docs.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Docs</a>
+      <a href="index-en.html" class="block px-4 py-2 rounded-lg bg-redpd/10 text-redpd">Home</a>
+      <a href="flash-en.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Flash Firmware</a>
+      <a href="docs-en.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Docs</a>
       <div class="flex items-center gap-2 mt-1 pt-2 border-t border-abu/20 text-[13px] font-bold">
-        <a href="index.html" class="block px-3 py-1 rounded-lg bg-redpd/10 text-redpd">ID</a>
-        <a href="index-en.html" class="block px-3 py-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">EN</a>
+        <a href="index.html" class="block px-3 py-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">ID</a>
+        <a href="index-en.html" class="block px-3 py-1 rounded-lg bg-redpd/10 text-redpd">EN</a>
       </div>
     </div>
   </nav>
@@ -78,76 +75,76 @@
         Ardu<span class="text-redpd">Claw</span>
       </h1>
       <p class="text-[16px] md:text-[17px] text-hitam mt-3 font-bold leading-relaxed max-w-[600px]">
-        <strong class="text-redpd">AI Agent Runtime</strong> untuk <strong>ESP32</strong>.
-        <span class="text-[#6E6E73] font-medium">Bukan sekadar chat bot &mdash; ini sudah seperti <strong class="text-hitam">bahasa pemrograman baru</strong>
-        yang kamu tulis pakai <strong class="text-hitam">kalimat sehari-hari</strong>.</span>
+        <strong class="text-redpd">AI Agent Runtime</strong> for <strong>ESP32</strong>.
+        <span class="text-[#6E6E73] font-medium">Not just a chatbot &mdash; this is a whole new <strong class="text-hitam">programming language</strong>
+        that you write in <strong class="text-hitam">everyday sentences</strong>.</span>
       </p>
       <div class="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[14px] text-[#6E6E73] font-medium">
-        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-redpd shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Logika <strong class="text-hitam">if/else</strong></span>
+        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-redpd shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><strong class="text-hitam">if/else</strong> logic</span>
         <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-redpd shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>GPIO, <strong class="text-hitam">MQTT</strong>, ADC</span>
-        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-redpd shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><strong class="text-hitam">Persisten</strong> walau reset</span>
+        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-redpd shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><strong class="text-hitam">Persistent</strong> across reset</span>
         <span class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-redpd/10 text-redpd text-[12px] font-bold">BETA</span>
       </div>
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mt-7">
-          <a href="flash.html" class="inline-flex items-center gap-2 px-6 py-3 bg-redpd text-white font-extrabold text-[15px] rounded-2xl shadow-[0_4px_16px_rgba(243,29,28,0.3)] hover:bg-[#d0100f] transition-all duration-150 no-underline">
+          <a href="flash-en.html" class="inline-flex items-center gap-2 px-6 py-3 bg-redpd text-white font-extrabold text-[15px] rounded-2xl shadow-[0_4px_16px_rgba(243,29,28,0.3)] hover:bg-[#d0100f] transition-all duration-150 no-underline">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            Mulai Flash Firmware
+            Start Flashing
           </a>
           <a href="#how" class="inline-flex items-center gap-2 px-6 py-3 bg-[#f0f0f4] text-hitam font-bold text-[15px] rounded-2xl border border-abu/40 hover:bg-[#e4e4ea] transition-all duration-150 no-underline">
-            Cara Kerja
+            How It Works
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </a>
       </div>
     </div>
 
-    <!-- cara kerja -->
+    <!-- how it works -->
     <div id="how" class="mt-16 w-full max-w-[800px] animate-[fadeUp_.7s_ease_.3s_both]">
       <div class="bg-white/70 backdrop-blur-sm border border-abu/30 rounded-3xl p-6 md:p-8 text-left">
         <h2 class="text-[20px] md:text-[24px] font-extrabold tracking-tight text-hitam mb-5">
-          Cara Kerja
+          How It Works
         </h2>
         <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
           <div class="flex-1 w-full">
             <div class="bg-[#0d1117] border border-[#30363d] rounded-xl px-4 py-3 font-mono text-[13px] leading-relaxed text-[#c9d1d9]">
-              <span class="text-[#6E6E73]">&gt; </span><span class="text-[#58a6ff]">Kamu</span>:<br>
-              <span class="text-[#f0f0f5]">"terima data dari mqtt topik <strong class="text-[#F9A61A]">rumah/lampu</strong></span><br>
-              <span class="text-[#f0f0f5]"> jika payload <strong class="text-[#F9A61A]">on</strong> nyalakan LED pin 27,</span><br>
-              <span class="text-[#f0f0f5]"> jika <strong class="text-[#F9A61A]">off</strong> matikan,</span><br>
-              <span class="text-[#f0f0f5]"> dan simpan permanen</span><br>
+              <span class="text-[#6E6E73]">&gt; </span><span class="text-[#58a6ff]">You</span>:<br>
+              <span class="text-[#f0f0f5]">"receive data from mqtt topic <strong class="text-[#F9A61A]">home/light</strong></span><br>
+              <span class="text-[#f0f0f5]"> if payload <strong class="text-[#F9A61A]">on</strong> turn on LED at pin 27,</span><br>
+              <span class="text-[#f0f0f5]"> if <strong class="text-[#F9A61A]">off</strong> turn it off,</span><br>
+              <span class="text-[#f0f0f5]"> and save permanently</span><br>
               <span class="text-[#6E6E73]">&gt; </span><span class="text-[#3fb950]">AI Agent</span>:<br>
-              <span class="text-[#3fb950]">OK: mqtt.subscribe topic=rumah/lampu</span><br>
+              <span class="text-[#3fb950]">OK: mqtt.subscribe topic=home/light</span><br>
               <span class="text-[#3fb950]">     action=gpio.write pin=27 value={PAYLOAD}</span><br>
-              <span class="text-[#6E6E73]">Tersimpan di NVS &mdash; tetap ada walau ESP32 dimatikan.</span>
+              <span class="text-[#6E6E73]">Saved in NVS &mdash; survives even if ESP32 is powered off.</span>
             </div>
           </div>
           <div class="flex-1 w-full text-[14px] text-[#6E6E73] leading-relaxed space-y-3">
-            <p><strong class="text-hitam">Kamu bilang apa yang mau terjadi</strong> &mdash; dalam bahasa Indonesia atau Inggris. AI Agent di ESP32 yang nerjemahin jadi eksekusi nyata.</p>
-            <p>Bikin logika <strong class="text-hitam">if/else</strong>, subscribe <strong class="text-hitam">MQTT</strong>, baca sensor, kontrol GPIO &mdash; semua dari chat, tanpa nulis C++.</p>
-            <p>Hasilnya <strong class="text-hitam">tersimpan otomatis</strong> di NVS ESP32. Reset berkali-kali pun logic tetap jalan.</p>
+            <p><strong class="text-hitam">You say what you want to happen</strong> &mdash; in Indonesian or English. The AI Agent on the ESP32 translates it into real actions.</p>
+            <p>Create <strong class="text-hitam">if/else</strong> logic, subscribe to <strong class="text-hitam">MQTT</strong>, read sensors, control GPIO &mdash; all from chat, no C++ required.</p>
+            <p>Everything is <strong class="text-hitam">automatically saved</strong> in the ESP32's NVS. Reset as many times as you want &mdash; your logic stays.</p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- perbandingan -->
+    <!-- comparison -->
     <div class="mt-10 w-full max-w-[800px] animate-[fadeUp_.7s_ease_.35s_both]">
       <div class="bg-white/70 backdrop-blur-sm border border-abu/30 rounded-3xl p-6 md:p-8 text-left">
         <h2 class="text-[20px] md:text-[24px] font-extrabold tracking-tight text-hitam mb-4">
-          Kenapa ArduClaw?
+          Why ArduClaw?
         </h2>
         <p class="text-[14px] text-[#6E6E73] leading-relaxed mb-4">
-          Sudah ada <a href="https://esp-claw.com" class="text-redpd font-bold hover:underline" target="_blank">ESP-Claw</a> dari Espressif &mdash; kenapa bikin lagi?
+          There's already <a href="https://esp-claw.com" class="text-redpd font-bold hover:underline" target="_blank">ESP-Claw</a> from Espressif &mdash; so why build another one?
         </p>
         <p class="text-[14px] text-[#6E6E73] leading-relaxed mb-4">
-          ESP-Claw memang canggih, tapi <span class="font-bold text-hitam">terbatas</span> &mdash; hanya berjalan di board tertentu seperti <span class="font-bold text-hitam">ESP32-S3</span>. Board ESP32 murah seperti ESP32-WROOM, ESP32-C3, atau ESP32 dengan RAM &lt; 1MB tidak didukung.
+          ESP-Claw is powerful, but <span class="font-bold text-hitam">limited</span> &mdash; it only runs on specific boards like <span class="font-bold text-hitam">ESP32-S3</span>. Affordable boards like ESP32-WROOM, ESP32-C3, or ESP32 with &lt; 1MB RAM are not supported.
         </p>
         <p class="text-[14px] text-[#6E6E73] leading-relaxed mb-4">
-          <span class="font-bold text-hitam">ArduClaw</span> hadir untuk mengubah itu. <span class="font-bold text-hitam">Masih beta</span> &mdash; saat ini baru support <span class="font-bold text-hitam">board ESP32 DEV</span> yang paling banyak dijual di pasaran. Ke depannya akan dikembangkan untuk board ESP32 lain.
+          <span class="font-bold text-hitam">ArduClaw</span> changes that. <span class="font-bold text-hitam">Still in beta</span> &mdash; currently supports the <span class="font-bold text-hitam">ESP32 DEV</span> boards that are widely available. Support for other boards is coming.
         </p>
         <div class="bg-redpd/5 border border-redpd/15 rounded-2xl px-5 py-4 mt-5">
           <p class="text-[14px] text-hitam font-bold leading-relaxed">
-            &ldquo;Ini bakal mengubah cara ngoding ESP32 &mdash; dari nulis <code class="text-[13px] bg-[#f0f0f5] px-2 py-0.5 rounded font-mono">digitalWrite(27, HIGH)</code>
-            jadi cukup bilang <span class="text-redpd">nyalakan lampu di pin 27</span>.&rdquo;
+            &ldquo;This changes how we code ESP32 &mdash; from writing <code class="text-[13px] bg-[#f0f0f5] px-2 py-0.5 rounded font-mono">digitalWrite(27, HIGH)</code>
+            to just saying <span class="text-redpd">turn on the light at pin 27</span>.&rdquo;
           </p>
         </div>
       </div>
@@ -160,28 +157,28 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F31D1C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </div>
         <h3 class="text-[14px] font-extrabold text-hitam mb-1">ESP32 DEV Board</h3>
-        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Support board ESP32 DEV paling populer (WROOM, DevKitC). Masih beta, board lain menyusul.</p>
+        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Supports the most popular ESP32 DEV boards (WROOM, DevKitC). Beta, more boards coming.</p>
       </div>
       <div class="bg-white/70 backdrop-blur-sm border border-abu/30 rounded-2xl p-5 text-left">
         <div class="w-9 h-9 rounded-[11px] bg-orpd/10 flex items-center justify-center mb-3">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F9A61A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
         </div>
-        <h3 class="text-[14px] font-extrabold text-hitam mb-1">Logika &amp; MQTT</h3>
-        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Bikin logika if/else, subscribe MQTT, baca sensor &mdash; semua dari chat tanpa coding manual.</p>
+        <h3 class="text-[14px] font-extrabold text-hitam mb-1">Logic &amp; MQTT</h3>
+        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Create if/else logic, subscribe to MQTT, read sensors &mdash; all via chat without manual coding.</p>
       </div>
       <div class="bg-white/70 backdrop-blur-sm border border-abu/30 rounded-2xl p-5 text-left">
         <div class="w-9 h-9 rounded-[11px] bg-[#e8e4f0] flex items-center justify-center mb-3">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#533AB7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
-        <h3 class="text-[14px] font-extrabold text-hitam mb-1">Persisten (NVS)</h3>
-        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Semua konfigurasi &amp; logika tersimpan di NVS &mdash; gak hilang meski ESP32 di-reset atau dimatikan.</p>
+        <h3 class="text-[14px] font-extrabold text-hitam mb-1">Persistent (NVS)</h3>
+        <p class="text-[12px] text-[#6E6E73] leading-relaxed">All config &amp; logic is saved to NVS &mdash; survives ESP32 resets and power cycles.</p>
       </div>
       <div class="bg-white/70 backdrop-blur-sm border border-abu/30 rounded-2xl p-5 text-left">
         <div class="w-9 h-9 rounded-[11px] bg-redpd/10 flex items-center justify-center mb-3">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F31D1C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
         </div>
-        <h3 class="text-[14px] font-extrabold text-hitam mb-1">Flash &lt; 1 Menit</h3>
-        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Flash firmware via Web Serial, setup WiFi &amp; LLM dari browser. Siap pakai dalam hitungan menit.</p>
+        <h3 class="text-[14px] font-extrabold text-hitam mb-1">Flash &lt; 1 Minute</h3>
+        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Flash firmware via Web Serial, set up WiFi &amp; LLM from the browser. Ready in minutes.</p>
       </div>
     </div>
   </main>
@@ -196,10 +193,10 @@
         <a href="https://instagram.com/ajangrahmat" class="font-bold text-hitam hover:text-redpd transition-colors no-underline" target="_blank">AjangRahmat</a>
       </div>
       <div class="flex items-center gap-4">
-        <a href="index.html" class="hover:text-hitam transition-colors no-underline">Home</a>
-        <a href="flash.html" class="hover:text-hitam transition-colors no-underline">Flash</a>
-        <a href="docs.html" class="hover:text-hitam transition-colors no-underline">Docs</a>
-        <a href="index-en.html" class="hover:text-hitam transition-colors no-underline">English</a>
+        <a href="index-en.html" class="hover:text-hitam transition-colors no-underline">Home</a>
+        <a href="flash-en.html" class="hover:text-hitam transition-colors no-underline">Flash</a>
+        <a href="docs-en.html" class="hover:text-hitam transition-colors no-underline">Docs</a>
+        <a href="index.html" class="hover:text-hitam transition-colors no-underline">Bahasa</a>
         <a href="https://github.com/ajangrahmat/arduclaw" class="hover:text-hitam transition-colors no-underline" target="_blank">GitHub</a>
       </div>
     </div>

@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dokumentasi — ArduClaw</title>
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="canonical" href="https://avisha.id/arduclaw/docs.html" />
+  <meta name="description" content="Dokumentasi lengkap ArduClaw — AI Agent Runtime untuk ESP32. Panduan mulai, contoh prompt, skill system, MQTT, GPIO." />
+  <meta property="og:title" content="Dokumentasi — ArduClaw AI Agent Runtime" />
+  <meta property="og:description" content="Panduan lengkap instalasi, konfigurasi, skill, prompt, MQTT, GPIO." />
+  <meta property="og:image" content="https://avisha.id/arduclaw/maskot.webp" />
+  <meta property="og:url" content="https://avisha.id/arduclaw/docs.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="style.css" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Nunito',system-ui,sans-serif}
+    html{scroll-behavior:smooth;scroll-padding-top:80px}
+    @keyframes floatBlob{0%,100%{transform:translateY(0)scale(1)}50%{transform:translateY(-18px)scale(1.03)}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .anim-float{animation:floatBlob 9s ease-in-out infinite}
+    .prose h2{margin-top:2rem;margin-bottom:.75rem;font-size:1.375rem;font-weight:800;color:#171717;letter-spacing:-.02em}
+    .prose h3{margin-top:1.5rem;margin-bottom:.5rem;font-size:1.0625rem;font-weight:700;color:#171717}
+    .prose p{font-size:.9375rem;line-height:1.65;color:#6E6E73;margin-bottom:.75rem}
+    .prose p strong,.prose li strong{color:#171717}
+    .prose ul,.prose ol{margin-bottom:.75rem;padding-left:1.25rem;font-size:.9375rem;color:#6E6E73;line-height:1.65}
+    .prose li{margin-bottom:.25rem}
+    .prose a{color:#F31D1C;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+    .prose a:hover{color:#d0100f}
+    .prose code{font-family:'JetBrains Mono',monospace;font-size:.8125rem;background:#f0f0f5;color:#171717;padding:2px 8px;border-radius:6px;font-weight:600}
+    .prose pre{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:12px;padding:14px 16px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:.8125rem;line-height:1.55;margin-bottom:1rem}
+    .prose pre code{background:none;padding:0;color:inherit;font-size:inherit;border-radius:0}
+    .prose blockquote{border-left:3px solid #F31D1C;padding:.5rem 1rem;margin-bottom:.75rem;background:#fef2f2;border-radius:0 10px 10px 0;font-size:.9375rem;color:#6E6E73}
+    .prose blockquote strong{color:#171717}
+    .prose hr{border:none;border-top:1px solid rgba(207,207,207,.3);margin:2rem 0}
+
+    @media(max-width:767px){.prose h2{font-size:1.25rem}.prose h3{font-size:1rem}.prose p,.prose li,.prose blockquote{font-size:.875rem}.prose code{font-size:.75rem}.prose pre{font-size:.75rem;padding:12px}}
+  </style>
+</head>
+<body class="bg-[#f5f5f7] min-h-screen font-nunito text-hitam antialiased">
+
+  <!-- blobs -->
+  <div class="fixed w-[500px] h-[500px] rounded-full bg-redpd/5 blur-[90px] -top-[160px] -right-[120px] pointer-events-none z-0 anim-float"></div>
+  <div class="fixed w-[320px] h-[320px] rounded-full bg-orpd/8 blur-[90px] bottom-[80px] -left-[100px] pointer-events-none z-0 anim-float" style="animation-delay:-5s"></div>
+  <div class="fixed inset-0 pointer-events-none z-0" style="background-image:linear-gradient(rgba(243,29,28,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(243,29,28,0.03) 1px,transparent 1px);background-size:40px 40px"></div>
+
+  <!-- navbar -->
+  <nav class="relative z-30 flex items-center justify-center w-full px-4 md:px-8 py-4 bg-white/70 backdrop-blur-lg border-b border-abu/30 shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
+    <div class="flex items-center justify-between w-full max-w-[1120px]">
+      <a href="index.html" class="flex items-center gap-3 no-underline shrink-0 group">
+        <img src="maskot.webp" alt="ArduClaw" class="h-11 w-auto drop-shadow-[0_2px_6px_rgba(243,29,28,0.12)] transition-transform duration-200 group-hover:scale-105" />
+        <div class="flex flex-col leading-tight">
+          <span class="text-[24px] font-extrabold tracking-tight text-hitam">Ardu<span class="text-redpd">Claw</span></span>
+          <span class="text-[10px] font-medium text-abu tracking-[.03em] -mt-0.5">ArduMeka Claw AI Bot</span>
+        </div>
+      </a>
+      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" style="-webkit-tap-highlight-color:transparent">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="hidden md:flex items-center gap-1 text-[15px] font-bold">
+        <a href="index.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors">Home</a>
+        <a href="flash.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors">Flash Firmware</a>
+        <a href="docs.html" class="block px-4 py-1.5 rounded-lg bg-redpd/10 text-redpd">Docs</a>
+        <span class="w-px h-4 bg-abu/40 mx-1.5"></span>
+        <a href="docs.html" class="block px-2 py-1 rounded-lg bg-redpd/10 text-redpd text-[13px] font-bold transition-colors">ID</a>
+        <a href="docs-en.html" class="block px-2 py-1 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd text-[13px] font-bold transition-colors">EN</a>
+      </div>
+    </div>
+    <div class="hidden md:hidden absolute top-full left-0 w-full bg-white/95 backdrop-blur-lg border-b border-abu/30 px-4 py-3 flex flex-col gap-1 text-[15px] font-bold shadow-lg z-40" id="navMenuMobile">
+      <a href="index.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Home</a>
+      <a href="flash.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Flash Firmware</a>
+      <a href="docs.html" class="block px-4 py-2 rounded-lg bg-redpd/10 text-redpd">Docs</a>
+      <div class="flex items-center gap-2 mt-1 pt-2 border-t border-abu/20 text-[13px] font-bold">
+        <a href="docs.html" class="block px-3 py-1 rounded-lg bg-redpd/10 text-redpd">ID</a>
+        <a href="docs-en.html" class="block px-3 py-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">EN</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- header -->
+  <div class="relative z-10 max-w-[1280px] mx-auto px-4 w-full animate-[fadeUp_.6s_ease_.1s_both] pt-10 md:pt-14 mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+      <div>
+        <h1 class="text-[30px] md:text-[38px] font-extrabold tracking-tight text-hitam leading-tight">
+          Dokumentasi <span class="text-redpd">ArduClaw</span>
+        </h1>
+        <p class="text-[14px] text-[#6E6E73] mt-0.5 font-medium">Panduan lengkap instalasi, konfigurasi, skill, dan contoh prompt</p>
+      </div>
+    </div>
+    <div class="mt-4 h-px bg-gradient-to-r from-redpd/20 via-orpd/20 to-transparent"></div>
+  </div>
+
+  <div class="relative z-10 flex flex-col lg:flex-row max-w-[1280px] mx-auto px-4 w-full animate-[fadeUp_.6s_ease_.15s_both] mb-16 gap-6">
+
+    <!-- sidebar desktop -->
+    <aside class="hidden lg:block w-[250px] shrink-0">
+      <nav class="sticky top-[90px] max-h-[calc(100vh-110px)] overflow-y-auto scrollbar-thin">
+        <p class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-3">Daftar Isi</p>
+        <div class="flex flex-col gap-0.5 text-[13px] font-semibold" id="tocLinks">
+          <a href="#pengantar" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="pengantar">Pengantar</a>
+          <a href="#mulai" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="mulai">Mulai (Quickstart)</a>
+          <a href="#flash" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="flash">Flash Firmware</a>
+          <a href="#wifi" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="wifi">Konfigurasi WiFi</a>
+          <a href="#llm" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="llm">Konfigurasi LLM</a>
+          <a href="#chat" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="chat">Chat / Prompt</a>
+          <a href="#contoh-prompt" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="contoh-prompt">Contoh Prompt</a>
+          <a href="#gpio" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="gpio">Skill GPIO</a>
+          <a href="#monitor" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="monitor">Skill Monitor</a>
+          <a href="#adc" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="adc">Skill ADC</a>
+          <a href="#mqtt" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="mqtt">Skill MQTT</a>
+          <a href="#system" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="system">Skill System</a>
+          <a href="#dashboard" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="dashboard">Dashboard Web</a>
+          <a href="#persist" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="persist">Persistence (NVS)</a>
+          <a href="#troubleshoot" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="troubleshoot">Troubleshooting</a>
+          <a href="#strapping" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="strapping">Strapping Pins</a>
+          <a href="#faq" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="faq">FAQ</a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- mobile toc -->
+    <details class="lg:hidden w-full bg-white/70 backdrop-blur-sm border border-abu/30 rounded-2xl overflow-hidden">
+      <summary class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] p-4 cursor-pointer select-none list-none flex items-center justify-between">
+        <span>Daftar Isi</span>
+        <svg class="w-4 h-4 text-abu transition-transform duration-200 group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="px-4 pb-4 flex flex-col gap-1 text-[13px] font-semibold border-t border-abu/20 pt-3">
+        <a href="#pengantar" class="text-hitam hover:text-redpd no-underline transition-colors">Pengantar</a>
+        <a href="#mulai" class="text-hitam hover:text-redpd no-underline transition-colors">Mulai (Quickstart)</a>
+        <a href="#flash" class="text-hitam hover:text-redpd no-underline transition-colors">Flash Firmware</a>
+        <a href="#wifi" class="text-hitam hover:text-redpd no-underline transition-colors">Konfigurasi WiFi</a>
+        <a href="#llm" class="text-hitam hover:text-redpd no-underline transition-colors">Konfigurasi LLM</a>
+        <a href="#chat" class="text-hitam hover:text-redpd no-underline transition-colors">Chat / Prompt</a>
+        <a href="#contoh-prompt" class="text-hitam hover:text-redpd no-underline transition-colors">Contoh Prompt</a>
+        <a href="#gpio" class="text-hitam hover:text-redpd no-underline transition-colors">Skill GPIO</a>
+        <a href="#monitor" class="text-hitam hover:text-redpd no-underline transition-colors">Skill Monitor</a>
+        <a href="#adc" class="text-hitam hover:text-redpd no-underline transition-colors">Skill ADC</a>
+        <a href="#mqtt" class="text-hitam hover:text-redpd no-underline transition-colors">Skill MQTT</a>
+        <a href="#system" class="text-hitam hover:text-redpd no-underline transition-colors">Skill System</a>
+        <a href="#dashboard" class="text-hitam hover:text-redpd no-underline transition-colors">Dashboard Web</a>
+        <a href="#persist" class="text-hitam hover:text-redpd no-underline transition-colors">Persistence (NVS)</a>
+        <a href="#troubleshoot" class="text-hitam hover:text-redpd no-underline transition-colors">Troubleshooting</a>
+        <a href="#strapping" class="text-hitam hover:text-redpd no-underline transition-colors">Strapping Pins</a>
+        <a href="#faq" class="text-hitam hover:text-redpd no-underline transition-colors">FAQ</a>
+      </div>
+    </details>
+
+    <!-- content -->
+    <div class="flex-1 min-w-0">
+    <div class="bg-white border border-abu/40 rounded-3xl shadow-[0_2px_6px_rgba(0,0,0,0.04),0_12px_36px_rgba(0,0,0,0.07)] p-6 md:p-10 prose max-w-none">
+
+      <!-- ─── Pengantar ─── -->
+      <h2 id="pengantar">1. Pengantar</h2>
+      <p>
+        <strong>ArduClaw</strong> adalah <strong>AI Agent Runtime</strong> untuk board <strong>ESP32</strong>.
+        Berbeda dengan firmware biasa yang perlu ditulis kode C++, ArduClaw memungkinkan kamu
+        memberikan instruksi dalam <strong>bahasa sehari-hari</strong> (prompt) melalui web chat.
+        AI akan menerjemahkan perintahmu menjadi aksi nyata di GPIO, MQTT, ADC, dan lainnya.
+      </p>
+      <p>
+        Saat ini <strong>masih beta</strong> &mdash; support board <strong>ESP32 DEV</strong> (ESP32-WROOM, ESP32-DevKitC).
+        Board lain menyusul.
+      </p>
+      <blockquote>
+        <strong>Prinsip:</strong> Daripada nulis kode <code>digitalWrite(27, HIGH)</code>,
+        cukup bilang <em>&ldquo;nyalakan lampu di pin 27&rdquo;</em> &mdash; AI Agent yang urus sisanya.
+      </blockquote>
+
+      <hr />
+
+      <!-- ─── Mulai ─── -->
+      <h2 id="mulai">2. Mulai (Quickstart)</h2>
+      <p>Yang kamu butuhkan:</p>
+      <ul>
+        <li>Board <strong>ESP32 DEV</strong> (contoh: ESP32-WROOM-32, ESP32-DevKitC)</li>
+        <li>Kabel <strong>USB-A to Micro USB</strong></li>
+        <li>Browser <strong>Chrome</strong> atau <strong>Edge</strong> (butuh Web Serial API)</li>
+        <li>Koneksi internet (untuk download firmware &amp; API LLM)</li>
+      </ul>
+      <p>Langkah-langkah:</p>
+      <ol>
+        <li><strong>Flash firmware</strong> &mdash; buka <a href="flash.html">Flash Firmware</a>, connect USB, upload <code>arduclaw-esp32-v02.bin</code></li>
+        <li><strong>Tekan RESET (EN)</strong> di board ESP32, tunggu 2 detik</li>
+        <li><strong>Connect Serial</strong> &mdash; klik Connect Serial di kolom WiFi</li>
+        <li><strong>Isi SSID &amp; Password</strong> WiFi, klik Save</li>
+        <li><strong>Tunggu</strong> sampai status Connected &mdash; IP akan muncul</li>
+        <li><strong>Isi LLM Config</strong> &mdash; URL, API Key, Model, klik Save &amp; Test</li>
+        <li><strong>Buka Dashboard</strong> &mdash; klik link IP yang muncul</li>
+        <li><strong>Mulai Chat</strong> &mdash; kirim prompt seperti &ldquo;nyalakan LED di pin 27&rdquo;</li>
+      </ol>
+      <blockquote>
+        <strong>Catatan:</strong> Setelah flash, semua konfigurasi (WiFi, LLM, MQTT subscriptions, GPIO mode)
+        tersimpan di NVS ESP32 &mdash; tidak hilang meski dimatikan. Hanya akan hilang jika di-<em>re-flash</em>
+        dengan merged binary.
+      </blockquote>
+
+      <hr />
+
+      <!-- ─── Flash ─── -->
+      <h2 id="flash">3. Flash Firmware</h2>
+      <p>Gunakan halaman <a href="flash.html">Flash Firmware</a> untuk mengupload firmware ke ESP32:</p>
+      <ol>
+        <li>Klik <strong>Connect to Device</strong> &mdash; pilih port USB ESP32</li>
+        <li>Pilih file <code>.bin</code> firmware &mdash; bisa pakai built-in atau upload manual</li>
+        <li>Klik <strong>Flash</strong> &mdash; tunggu sampai selesai (progress bar)</li>
+        <li>Setelah selesai, tekan <strong>RESET (EN)</strong> di board</li>
+        <li>Lanjut ke konfigurasi WiFi &amp; LLM via Serial</li>
+      </ol>
+      <p>Fungsi lain:</p>
+      <ul>
+        <li><strong>Erase</strong> &mdash; menghapus semua flash (termasuk NVS)</li>
+        <li><strong>Download</strong> &mdash; download firmware built-in untuk flashing manual</li>
+      </ul>
+
+      <hr />
+
+      <!-- ─── WiFi ─── -->
+      <h2 id="wifi">4. Konfigurasi WiFi</h2>
+      <p>Setelah flash, board butuh koneksi WiFi untuk akses dashboard dan LLM:</p>
+      <ol>
+        <li>Pastikan Serial sudah connect (klik <strong>Connect Serial</strong> di kolom WiFi)</li>
+        <li>Isi <strong>SSID</strong> dan <strong>Password</strong></li>
+        <li>Klik <strong>Save</strong> &mdash; board akan menyimpan dan mencoba konek</li>
+        <li>Tunggu status <strong>Connected</strong> &mdash; IP akan muncul di banner</li>
+        <li>Klik link IP untuk membuka <strong>Dashboard</strong> ESP32</li>
+      </ol>
+      <p>Format command yang dikirim via Serial:</p>
+      <pre><code>{"c":"ws","s":"nama_wifi","p":"password"}</code></pre>
+      <p>Status WiFi bisa dicek dengan:</p>
+      <pre><code>{"c":"wst"}</code></pre>
+
+      <hr />
+
+      <!-- ─── LLM ─── -->
+      <h2 id="llm">5. Konfigurasi LLM</h2>
+      <p>ArduClaw butuh API LLM (OpenAI-compatible) untuk memproses prompt:</p>
+      <ol>
+        <li>Serial harus connect (klik <strong>Connect Serial</strong> di kolom LLM)</li>
+        <li>Isi <strong>API URL</strong> &mdash; contoh: <code>https://ai.sumopod.com/v1/chat/completions</code></li>
+        <li>Isi <strong>API Key</strong> &mdash; dari provider LLM kamu</li>
+        <li>Isi <strong>Model</strong> &mdash; contoh: <code>gpt-4o-mini</code>, <code>claude-3-haiku</code>, dll</li>
+        <li>Klik <strong>Save Config</strong></li>
+        <li>Klik <strong>Test</strong> untuk verifikasi koneksi ke LLM</li>
+      </ol>
+      <p>Format command ke Serial:</p>
+      <pre><code>{"c":"llm_set","url":"https://...","key":"sk-...","model":"gpt-4o-mini"}
+{"c":"llm_test"}</code></pre>
+      <blockquote>
+        <strong>Provider yang bisa digunakan:</strong> OpenAI, Anthropic, Google Gemini (via OpenAI-compatible proxy),
+        atau self-hosted LLM seperti vLLM, Ollama (dengan proxy OpenAI).
+      </blockquote>
+
+      <hr />
+
+      <!-- ─── Chat ─── -->
+      <h2 id="chat">6. Chat / Prompt</h2>
+      <p>
+        Setelah semua terkonfigurasi, buka Dashboard ESP32 di browser dan masuk ke halaman <strong>Chat</strong>.
+        Ini adalah antarmuka utama untuk berinteraksi dengan AI Agent.
+      </p>
+      <p>Cara kerja:</p>
+      <ol>
+        <li>Ketik perintah dalam bahasa Indonesia atau Inggris di chat</li>
+        <li>ESP32 kirim prompt ke LLM via API</li>
+        <li>LLM menentukan skill apa yang harus dijalankan</li>
+        <li>ESP32 eksekusi skill (GPIO, MQTT, dll) dan kirim hasilnya ke chat</li>
+      </ol>
+      <p>Setiap chat <strong>tersimpan otomatis</strong> di localStorage browser &mdash; tidak hilang meski halaman di-refresh.</p>
+
+      <hr />
+
+      <!-- ─── Contoh Prompt ─── -->
+      <h2 id="contoh-prompt">7. Contoh Prompt</h2>
+
+      <h3>GPIO Dasar</h3>
+      <pre><code>nyalakan LED di pin 27
+matikan lampu pin 27
+set pin 5 output high
+baca pin 34</code></pre>
+
+      <h3>GPIO Mode</h3>
+      <pre><code>atur pin 26 sebagai input pull-up
+set pin 16 sebagai output</code></pre>
+
+      <h3>GPIO Blink</h3>
+      <pre><code>kedipkan pin 27 5 kali dengan delay 300ms
+blink pin 2 terus menerus on=200 off=400
+stop blink pin 2</code></pre>
+
+      <h3>GPIO Monitor (tombol)</h3>
+      <pre><code>jika pin 26 ditekan (low), nyalakan LED pin 27
+saat pin 26 high, matikan LED pin 27
+stop monitoring pin 26</code></pre>
+
+      <h3>ADC (Analog)</h3>
+      <pre><code>baca nilai analog pin 34
+monitor sensor di pin 34 setiap 1 detik</code></pre>
+
+      <h3>MQTT</h3>
+      <pre><code>subscribe mqtt topik rumah/lampu dengan aksi gpio.write pin 27 {on, off}
+terima data dari mqtt topik sensor/suhu lalu aksi gpio.write pin 2 {on, off}
+lihat daftar subscription mqtt
+hapus subscription topik rumah/lampu
+hapus semua subscription mqtt</code></pre>
+
+      <h3>System</h3>
+      <pre><code>cek status sistem
+berapa ukuran heap?
+berapa uptime ESP32?
+restart ESP32
+reset ke pengaturan pabrik</code></pre>
+
+      <hr />
+
+      <!-- ─── GPIO ─── -->
+      <h2 id="gpio">8. Skill GPIO</h2>
+      <p>Skill untuk mengontrol pin GPIO ESP32.</p>
+
+      <h3>gpio.write</h3>
+      <p>Menulis nilai HIGH/LOW ke pin. Nilai bisa boolean atau string:</p>
+      <pre><code>tool: gpio.write
+args: {"pin":27,"value":true}
+args: {"pin":27,"value":"on"}
+args: {"pin":27,"value":"off"}
+args: {"pin":27,"value":"high"}
+args: {"pin":27,"value":"low"}</code></pre>
+
+      <h3>gpio.read</h3>
+      <p>Membaca nilai digital pin:</p>
+      <pre><code>tool: gpio.read
+args: {"pin":26}
+// return: {"pin":26,"value":1}</code></pre>
+
+      <h3>gpio.mode</h3>
+      <p>Set mode pin: <code>output</code>, <code>input</code>, <code>input_pullup</code>, <code>input_pulldown</code>:</p>
+      <pre><code>tool: gpio.mode
+args: {"pin":26,"mode":"input_pullup"}</code></pre>
+
+      <h3>gpio.blink</h3>
+      <p>Kedipkan pin sejumlah kali (synchronous, blocking):</p>
+      <pre><code>tool: gpio.blink
+args: {"pin":27,"on_ms":200,"off_ms":200,"count":5}</code></pre>
+
+      <h3>gpio.blink_start / gpio.blink_stop</h3>
+      <p>Kedipkan pin kontinu di task terpisah (asynchronous):</p>
+      <pre><code>tool: gpio.blink_start
+args: {"pin":2,"on_ms":300,"off_ms":500}
+
+tool: gpio.blink_stop
+args: {"pin":2}</code></pre>
+
+      <hr />
+
+      <!-- ─── Monitor ─── -->
+      <h2 id="monitor">9. Skill Monitor</h2>
+      <p>
+        Monitor pin secara real-time di background task. Ketika trigger terpenuhi,
+        skill lain dijalankan secara otomatis. Sangat berguna untuk membaca tombol atau sensor digital.
+      </p>
+      <p>Parameter:</p>
+      <ul>
+        <li><strong>pin</strong> &mdash; nomor GPIO yang dimonitor</li>
+        <li><strong>trigger</strong> &mdash; <code>low</code>, <code>high</code>, atau <code>change</code></li>
+        <li><strong>action</strong> &mdash; skill yang akan dijalankan (contoh: <code>gpio.write</code>)</li>
+        <li><strong>action_args</strong> &mdash; argumen untuk skill (contoh: <code>{"pin":27,"value":true}</code>)</li>
+        <li><strong>poll</strong> &mdash; interval polling dalam ms (default 50)</li>
+        <li><strong>debounce</strong> &mdash; waktu debounce dalam ms (default 30)</li>
+        <li><strong>once</strong> &mdash; jika true, monitor hanya sekali lalu berhenti</li>
+      </ul>
+      <pre><code>tool: gpio.monitor
+args: {"pin":26,"trigger":"low","action":"gpio.write","action_args":{"pin":27,"value":true},"poll":50,"debounce":30,"once":false}</code></pre>
+      <p>Untuk menghentikan monitor:</p>
+      <pre><code>tool: gpio.monitor_stop
+args: {"pin":26}</code></pre>
+
+      <hr />
+
+      <!-- ─── ADC ─── -->
+      <h2 id="adc">10. Skill ADC</h2>
+      <p>Membaca nilai analog dari pin ADC ESP32 (pin 32-39):</p>
+      <pre><code>tool: adc.read
+args: {"pin":34}
+// return: {"pin":34,"raw":2048,"voltage":1.65}</code></pre>
+
+      <hr />
+
+      <!-- ─── MQTT ─── -->
+      <h2 id="mqtt">11. Skill MQTT</h2>
+      <p>
+        MQTT memungkinkan ESP32 berkomunikasi dengan broker MQTT untuk IoT.
+        Subscription bisa ditambah via chat dan akan tersimpan otomatis di NVS.
+      </p>
+
+      <h3>mqtt.subscribe</h3>
+      <p>Subscribe ke topik MQTT dengan aksi tertentu. Gunakan <code>{PAYLOAD}</code> sebagai variable untuk payload MQTT:</p>
+      <pre><code>tool: mqtt.subscribe
+args: {"topic":"rumah/lampu","action":"gpio.write","action_args":{"pin":27,"value":"{PAYLOAD}"}}</code></pre>
+      <p>Jika MQTT publish payload <code>on</code> ke topik <code>rumah/lampu</code>, maka <code>{PAYLOAD}</code> akan diganti <code>on</code>
+      &rarr; <code>gpio.write({"pin":27,"value":"on"})</code> &rarr; LED menyala.</p>
+
+      <h3>mqtt.unsubscribe</h3>
+      <p>Hapus subscription:</p>
+      <pre><code>tool: mqtt.unsubscribe
+args: {"topic":"rumah/lampu"}</code></pre>
+      <p>Untuk hapus semua subscription:</p>
+      <pre><code>tool: mqtt.unsubscribe
+args: {"topic":""}</code></pre>
+
+      <h3>mqtt.list</h3>
+      <p>Lihat daftar subscription aktif:</p>
+      <pre><code>tool: mqtt.list
+args: {}</code></pre>
+
+      <h3>mqtt.status</h3>
+      <p>Cek status MQTT:</p>
+      <pre><code>tool: mqtt.status
+args: {}</code></pre>
+
+      <h3>Built-in MQTT Handler</h3>
+      <p>
+        ESP32 punya handler bawaan untuk topik <strong>hello/10219201/test</strong>.
+        Payload <code>on</code> akan menyalakan GPIO 27, payload <code>off</code> akan mematikannya.
+        Handler ini auto-subscribe saat broker connect &mdash; tidak perlu ditambah manual.
+      </p>
+
+      <h3>Persistence</h3>
+      <p>
+        Semua subscription MQTT <strong>tersimpan di NVS</strong> &mdash; tidak hilang saat reboot.
+        Subscription akan di-restore dan di-sync ke broker setiap kali WiFi/MQTT connect.
+        Hanya hilang jika di-<em>re-flash</em> dengan merged binary (karena NVS ikut terhapus).
+      </p>
+
+      <hr />
+
+      <!-- ─── System ─── -->
+      <h2 id="system">12. Skill System</h2>
+
+      <h3>system.status</h3>
+      <p>Menampilkan status ESP32: WiFi, IP, uptime, heap, jumlah skill, MQTT subscriptions:</p>
+      <pre><code>tool: system.status
+args: {}</code></pre>
+
+      <h3>system.clear_persist</h3>
+      <p>Hapus semua data persist (monitor, GPIO mode, MQTT subs) tanpa reboot:</p>
+      <pre><code>tool: system.clear_persist
+args: {}</code></pre>
+
+      <h3>system.reset_factory</h3>
+      <p>Factory reset &mdash; hapus semua NVS, restart ESP32. Setelah ini board seperti baru di-flash:</p>
+      <pre><code>tool: system.reset_factory
+args: {}</code></pre>
+
+      <hr />
+
+      <!-- ─── Dashboard ─── -->
+      <h2 id="dashboard">13. Dashboard Web</h2>
+      <p>
+        Setelah ESP32 connect WiFi, buka IP board di browser untuk mengakses dashboard.
+        Tersedia halaman-halaman berikut:
+      </p>
+      <ul>
+        <li><strong>Chat</strong> (/) &mdash; Antarmuka chat dengan AI Agent. Prompt dikirim ke LLM, skill dieksekusi langsung.</li>
+        <li><strong>Dashboard</strong> (/dashboard) &mdash; Status sistem: WiFi, IP, uptime, heap, jumlah skill.</li>
+        <li><strong>WiFi</strong> (/wifi) &mdash; Ganti SSID/Password WiFi dari web.</li>
+        <li><strong>LLM</strong> (/llm) &mdash; Ganti konfigurasi LLM dari web.</li>
+        <li><strong>MQTT</strong> (/mqtt) &mdash; Lihat, tambah, hapus subscription MQTT.</li>
+        <li><strong>Skills</strong> (/skills) &mdash; Daftar semua skill yang terdaftar di ESP32.</li>
+      </ul>
+      <p>
+        Navigasi menggunakan menu horizontal di desktop &mdash; di mobile (≤600px) berubah menjadi
+        <strong>hamburger menu</strong> dropdown.
+      </p>
+
+      <hr />
+
+      <!-- ─── Persist ─── -->
+      <h2 id="persist">14. Persistence (NVS)</h2>
+      <p>ArduClaw menggunakan <strong>Preferences (NVS)</strong> di ESP32 untuk menyimpan data secara persisten. Data yang tersimpan:</p>
+      <ul>
+        <li><strong>WiFi config</strong> &mdash; SSID &amp; password</li>
+        <li><strong>LLM config</strong> &mdash; API URL, key, model</li>
+        <li><strong>GPIO mode</strong> &mdash; mode pin yang diset via <code>gpio.mode</code></li>
+        <li><strong>Monitor config</strong> &mdash; konfigurasi <code>gpio.monitor</code></li>
+        <li><strong>MQTT subscriptions</strong> &mdash; daftar topic + action (max 20)</li>
+      </ul>
+      <p>
+        Data persist akan di-restore otomatis setiap boot. <strong>Catatan:</strong> flashing merged binary
+        (offset 0) akan menghapus seluruh NVS. Untuk menjaga data, gunakan flashing parsial atau
+        OTA update di masa depan.
+      </p>
+
+      <hr />
+
+      <!-- ─── Troubleshoot ─── -->
+      <h2 id="troubleshoot">15. Troubleshooting</h2>
+
+      <h3>Web Serial tidak muncul</h3>
+      <p>Gunakan Chrome atau Edge versi terbaru. Web Serial tidak support di Firefox atau Safari.</p>
+
+      <h3>Flash gagal / timeout</h3>
+      <ul>
+        <li>Coba ganti kabel USB &mdash; beberapa kabel hanya untuk charging, bukan data</li>
+        <li>Tekan dan tahan <strong>BOOT</strong> di ESP32 saat connecting, lepas setelah flash mulai</li>
+        <li>Turunkan baud rate di code (ganti <code>115200</code> jadi <code>921600</code> di connFlash)</li>
+      </ul>
+
+      <h3>Serial connect tapi ESP tidak merespons</h3>
+      <ul>
+        <li>Pastikan sudah tekan <strong>RESET (EN)</strong> setelah flash</li>
+        <li>Pastikan baud rate Serial 115200</li>
+        <li>Tunggu 5-10 detik, ESP butuh waktu boot</li>
+      </ul>
+
+      <h3>WiFi tidak bisa konek</h3>
+      <ul>
+        <li>Cek SSID &amp; password &mdash; ESP32 tidak support WiFi 5GHz, harus 2.4GHz</li>
+        <li>Pastikan router tidak memblokir perangkat baru</li>
+        <li>Coba restart ESP32 (tekan RESET)</li>
+      </ul>
+
+      <h3>LLM test gagal</h3>
+      <ul>
+        <li>Cek API URL &mdash; harus OpenAI-compatible</li>
+        <li>Cek API Key &mdash; pastikan valid dan tidak expired</li>
+        <li>Cek model name &mdash; beberapa provider punya nama model berbeda</li>
+        <li>Pastikan ESP32 sudah connect WiFi</li>
+      </ul>
+
+      <h3>MQTT subscription hilang setelah flash ulang</h3>
+      <p>
+        Wajar &mdash; merged binary nge-flash dari offset 0 dan menghapus NVS.
+        Tambah subscription lagi via chat setelah setup ulang.
+        Subscription tetap aman di <strong>reboot biasa</strong> (tanpa re-flash).
+      </p>
+
+      <h3>Chat error &ldquo;parse error&rdquo;</h3>
+      <p>
+        Biasanya karena response LLM mengandung karakter yang tidak valid.
+        Coba refresh halaman dan kirim prompt ulang.
+        Jika terus terjadi, cek API Key atau coba model LLM lain.
+      </p>
+
+      <hr />
+
+      <!-- ─── Strapping ─── -->
+      <h2 id="strapping">16. Strapping Pins</h2>
+      <p>
+        ESP32 memiliki pin-pin <strong>strapping</strong> yang memengaruhi mode boot:
+        GPIO <strong>0</strong>, <strong>2</strong>, <strong>5</strong>, <strong>12</strong>, <strong>15</strong>.
+        Mengubah state pin-pin ini saat boot bisa menyebabkan ESP32 gagal boot atau masuk mode flashing.
+      </p>
+      <p>
+        ArduClaw akan <strong>memperingatkan</strong> jika kamu menggunakan pin strapping,
+        tapi <strong>tidak memblokir</strong> &mdash; tanggung jawab ada di kamu.
+        Peringatan muncul di:
+      </p>
+      <ul>
+        <li><strong>Serial console</strong> &mdash; <code>[WARN] gpio.write: GPIO 0 adalah strapping pin!</code></li>
+        <li><strong>Chat bubble</strong> &mdash; hasil skill akan ditambahi <code>⚠️Strapping pin!</code></li>
+      </ul>
+      <blockquote>
+        <strong>Saran:</strong> Hindari pin strapping untuk project produksi. Gunakan GPIO 4, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33 yang aman.
+      </blockquote>
+
+      <hr />
+
+      <!-- ─── FAQ ─── -->
+      <h2 id="faq">17. FAQ</h2>
+
+      <h3>Apa bedanya ArduClaw dengan ESP-Claw?</h3>
+      <p>
+        ESP-Claw resmi dari Espressif hanya support board ESP32-S3 dengan RAM ≥ 1MB.
+        ArduClaw support board <strong>ESP32 DEV</strong> yang paling banyak dijual di pasaran &mdash;
+        ESP32-WROOM, ESP32-DevKitC, dan sejenisnya.
+      </p>
+
+      <h3>Apakah harus selalu online?</h3>
+      <p>
+        Ya &mdash; karena LLM dijalankan di cloud via API. Koneksi WiFi diperlukan setiap kali
+        ingin mengirim prompt. Ke depannya bisa support LLM lokal (small model).
+      </p>
+
+      <h3>Berapa banyak skill yang bisa dipakai?</h3>
+      <p>Maksimal 20 skill terdaftar. Saat ini sudah ada ~15 skill bawaan.</p>
+
+      <h3>Berapa banyak MQTT subscription?</h3>
+      <p>Maksimal <strong>20 subscription</strong> aktif.</p>
+
+      <h3>Aman kah pakai pin strapping?</h3>
+      <p>
+        Tidak disarankan untuk produksi. Tapi untuk prototyping/testing, ArduClaw hanya memberi
+        peringatan &mdash; tidak memblokir. Kamu tetap bisa pakai pin 0, 2, 5, 12, 15.
+      </p>
+
+      <h3>Bagaimana cara reset total?</h3>
+      <p>
+        Kirim prompt <em>&ldquo;reset ke pengaturan pabrik&rdquo;</em> di chat, atau kirim
+        <code>{"c":"rst"}</code> via Serial console.
+      </p>
+
+      <h3>Chat history ilang setelah refresh?</h3>
+      <p>
+        Tidak &mdash; chat tersimpan di <strong>localStorage</strong> browser.
+        Tapi history spesifik per browser &mdash; tidak sync antar perangkat.
+      </p>
+
+      <h3>Bisa pakai ESP32-C3 / ESP32-S2 / ESP32-S3?</h3>
+      <p>
+        Saat ini baru support ESP32 DEV (dual-core Xtensa). Support board lain sedang dikembangkan.
+        Jika kamu punya board lain, pantau update di <a href="https://avisha.id/arduclaw">website resmi</a>.
+      </p>
+
+    </div>
+    </div>
+  </div>
+
+  <!-- scroll-spy -->
+  <script>
+    (function(){const l=document.querySelectorAll('.toc-link'),s=[];l.forEach(a=>{const e=document.getElementById(a.dataset.target);if(e)s.push(e)});const o=new IntersectionObserver(e=>{let a='';e.forEach(n=>{if(n.isIntersecting)a=n.target.id});if(a)l.forEach(n=>{n.classList.toggle('bg-redpd/5',n.dataset.target===a);n.classList.toggle('text-redpd',n.dataset.target===a);n.classList.toggle('text-hitam',n.dataset.target!==a)})},{rootMargin:'-90px 0px -60% 0px'});s.forEach(e=>o.observe(e))})();
+  </script>
+
+  <!-- footer -->
+  <footer class="relative z-10 w-full border-t border-abu/20 bg-white/40 backdrop-blur-sm">
+    <div class="max-w-[1120px] mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-[#8E8E93]">
+      <div class="flex items-center gap-2">
+        <span>&copy; 2026</span>
+        <a href="https://avisha.id/arduclaw" class="font-bold text-hitam hover:text-redpd transition-colors no-underline">ArduClaw</a>
+        <span>by</span>
+        <a href="https://instagram.com/ajangrahmat" class="font-bold text-hitam hover:text-redpd transition-colors no-underline" target="_blank">AjangRahmat</a>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="hover:text-hitam transition-colors no-underline">Home</a>
+        <a href="flash.html" class="hover:text-hitam transition-colors no-underline">Flash</a>
+        <a href="docs.html" class="hover:text-hitam transition-colors no-underline">Docs</a>
+        <a href="docs-en.html" class="hover:text-hitam transition-colors no-underline">English</a>
+        <a href="https://github.com/ajangrahmat/arduclaw" class="hover:text-hitam transition-colors no-underline" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

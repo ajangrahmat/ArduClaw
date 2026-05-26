@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArduClaw Flasher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="canonical" href="https://avisha.id/arduclaw/flash.html" />
+  <meta name="description" content="Flash firmware ESP32 dari browser — tool Web Serial untuk upload .bin, konfigurasi WiFi, dan setup LLM dalam satu tempat." />
+  <meta property="og:title" content="ArduClaw Flasher — Flash WiFi LLM" />
+  <meta property="og:description" content="Upload firmware, atur WiFi, dan sambungkan LLM ke ESP32 langsung dari browser. Beta." />
+  <meta property="og:image" content="https://avisha.id/arduclaw/maskot.webp" />
+  <meta property="og:url" content="https://avisha.id/arduclaw/flash.html" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="style.css" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Nunito',system-ui,sans-serif}
+    .scrollbar-thin::-webkit-scrollbar{width:4px}
+    .scrollbar-thin::-webkit-scrollbar-track{background:transparent}
+    .scrollbar-thin::-webkit-scrollbar-thumb{background:#d4d4d4;border-radius:99px}
+    @keyframes floatBlob{0%,100%{transform:translateY(0)scale(1)}50%{transform:translateY(-18px)scale(1.03)}}
+    @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.3}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .anim-float{animation:floatBlob 9s ease-in-out infinite}
+    .blink{animation:pulse-dot .75s ease-in-out infinite}
+  </style>
+</head>
+<body class="bg-[#f5f5f7] min-h-screen font-nunito text-hitam antialiased">
+
+  <!-- decorative blobs -->
+  <div class="fixed w-[480px] h-[480px] rounded-full bg-redpd/5 blur-[90px] -top-[140px] -right-[100px] pointer-events-none z-0 anim-float"></div>
+  <div class="fixed w-[280px] h-[280px] rounded-full bg-orpd/8 blur-[90px] bottom-[60px] -left-[80px] pointer-events-none z-0 anim-float" style="animation-delay:-4s"></div>
+
+  <!-- subtle grid -->
+  <div class="fixed inset-0 pointer-events-none z-0" style="background-image:linear-gradient(rgba(243,29,28,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(243,29,28,0.03) 1px,transparent 1px);background-size:40px 40px"></div>
+
+  <!-- toast container -->
+  <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none" id="toastBox"></div>
+
+  <!-- navbar -->
+  <nav class="relative z-30 flex items-center justify-center w-full px-4 md:px-8 py-4 bg-white/70 backdrop-blur-lg border-b border-abu/30 shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
+    <div class="flex items-center justify-between w-full max-w-[1120px]">
+      <a href="index.html" class="flex items-center gap-3 no-underline shrink-0 group">
+        <img src="maskot.webp" alt="ArduClaw" class="h-11 w-auto drop-shadow-[0_2px_6px_rgba(243,29,28,0.12)] transition-transform duration-200 group-hover:scale-105" />
+        <div class="flex flex-col leading-tight">
+          <span class="text-[24px] font-extrabold tracking-tight text-hitam">Ardu<span class="text-redpd">Claw</span></span>
+          <span class="text-[10px] font-medium text-abu tracking-[.03em] -mt-0.5">ArduMeka Claw AI Bot</span>
+        </div>
+      </a>
+      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors active:bg-redpd/20" style="-webkit-tap-highlight-color:transparent">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="hidden md:flex items-center gap-1 text-[15px] font-bold">
+        <a href="index.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors duration-150">Home</a>
+        <a href="flash.html" class="block px-4 py-1.5 rounded-lg bg-redpd/10 text-redpd">Flash Firmware</a>
+        <a href="docs.html" class="block px-4 py-1.5 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd transition-colors duration-150">Docs</a>
+        <span class="w-px h-4 bg-abu/40 mx-1.5"></span>
+        <a href="flash.html" class="block px-2 py-1 rounded-lg bg-redpd/10 text-redpd text-[13px] font-bold transition-colors">ID</a>
+        <a href="flash-en.html" class="block px-2 py-1 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd text-[13px] font-bold transition-colors">EN</a>
+      </div>
+    </div>
+    <!-- mobile menu -->
+    <div class="hidden md:hidden absolute top-full left-0 w-full bg-white/95 backdrop-blur-lg border-b border-abu/30 px-4 py-3 flex flex-col gap-1 text-[15px] font-bold shadow-lg z-40" id="navMenuMobile">
+      <a href="index.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Home</a>
+      <a href="flash.html" class="block px-4 py-2 rounded-lg bg-redpd/10 text-redpd">Flash Firmware</a>
+      <a href="docs.html" class="block px-4 py-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">Docs</a>
+      <div class="flex items-center gap-2 mt-1 pt-2 border-t border-abu/20 text-[13px] font-bold">
+        <a href="flash.html" class="block px-3 py-1 rounded-lg bg-redpd/10 text-redpd">ID</a>
+        <a href="flash-en.html" class="block px-3 py-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">EN</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- hero -->
+  <div class="relative z-10 max-w-[1120px] mx-auto px-4 w-full animate-[fadeUp_.6s_ease_.1s_both] pt-10 md:pt-14 mb-5">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+      <div>
+        <h1 class="text-[28px] md:text-[34px] font-extrabold tracking-tight text-hitam leading-tight">
+          Flash &middot; WiFi &middot; <span class="text-redpd">LLM</span>
+        </h1>
+        <p class="text-[14px] text-[#6E6E73] mt-0.5 font-medium">Beta &mdash; support board ESP32 DEV paling populer</p>
+      </div>
+      <div class="flex items-center gap-1.5 text-[12px] font-bold shrink-0">
+        <span class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-redpd/10 text-redpd">1 Flash</span>
+        <svg class="w-3.5 h-3.5 text-abu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orpd/10 text-orpd">2 WiFi</span>
+        <svg class="w-3.5 h-3.5 text-abu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#e8e4f0] text-[#533AB7]">3 LLM</span>
+      </div>
+    </div>
+    <div class="mt-4 h-px bg-gradient-to-r from-redpd/20 via-orpd/20 to-transparent"></div>
+  </div>
+
+  <!-- 3 columns -->
+  <div class="relative z-10 flex flex-col lg:flex-row gap-4 w-full max-w-[1120px] mx-auto px-4 animate-[fadeUp_.7s_ease_.2s_both]">
+
+    <!-- ================================================================
+         COL 1 &mdash; FLASH
+         ================================================================ -->
+    <div class="flex-1 min-w-0 flex flex-col" id="col1">
+      <div class="flex-1 flex flex-col bg-white border border-abu/40 rounded-3xl shadow-[0_2px_6px_rgba(0,0,0,0.04),0_12px_36px_rgba(0,0,0,0.07)] p-6">
+
+        <!-- head -->
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-[42px] h-[42px] rounded-[13px] bg-redpd/10 flex items-center justify-center text-lg shrink-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F31D1C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div>
+            <h2 class="text-[17px] font-bold -tracking-[.2px]">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-redpd text-white text-[11px] font-extrabold mr-1.5 align-middle shrink-0">1</span>
+              Flash Firmware
+            </h2>
+            <p class="text-[12px] text-[#6E6E73] mt-0.5">Upload firmware ke ESP32 via USB</p>
+          </div>
+        </div>
+
+        <!-- Connection -->
+        <div class="mb-[18px] last:mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Koneksi USB</div>
+          <button class="btn-ghost" id="btnConnect" onclick="toggleConn()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+            Connect to Device
+          </button>
+          <div class="flex items-center gap-2 mt-2 text-[12px] text-[#6E6E73]">
+            <span class="dot" id="flashDot"></span>
+            <span id="flashLabel">Not connected</span>
+          </div>
+        </div>
+
+        <!-- Firmware -->
+        <div class="mb-[18px] last:mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Firmware</div>
+          <div class="flex items-center gap-2 px-3 py-[9px] bg-[#f8f8fb] border border-abu/40 rounded-[11px] text-[13px] text-[#6E6E73] mb-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F31D1C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="font-bold text-hitam flex-1 truncate" id="fileName">No file selected</span>
+            <span class="text-[#AEAEB2] text-[12px]" id="fileSize"></span>
+          </div>
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <input type="file" id="fileInput" accept=".bin" onchange="onFileChange(event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+              <button class="btn-ghost-sm w-full pointer-events-none">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Change
+              </button>
+            </div>
+            <button class="btn-ghost-sm" onclick="dlFw()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </button>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="mb-[18px] last:mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Aksi</div>
+          <div class="flex gap-2">
+            <button class="btn-primary flex-1" id="btnFlash" disabled onclick="doFlash()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Flash
+            </button>
+            <button class="btn-secondary flex-1" id="btnErase" disabled onclick="doErase()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              Erase
+            </button>
+          </div>
+        </div>
+
+        <!-- Output -->
+        <div class="mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Output</div>
+          <div class="bg-[#0d1117] border border-[#30363d] rounded-xl px-3 py-[10px] font-mono text-[11.5px] leading-relaxed max-h-[120px] overflow-y-auto whitespace-pre-wrap break-all text-[#c9d1d9] min-h-[56px] scrollbar-thin" id="flashLog">
+            <span class="text-[#484f58] block">ArduClaw Flasher ready</span>
+            <span class="text-[#484f58] block">Connect device and select firmware</span>
+          </div>
+          <div class="h-[5px] bg-[#e8e8ec] rounded-full overflow-hidden mt-2">
+            <div class="h-full w-0 rounded-full transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" id="prog" style="background:linear-gradient(90deg,#F31D1C,#F9A61A)"></div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /col1 -->
+
+    <!-- ================================================================
+         COL 2 &mdash; WIFI
+         ================================================================ -->
+    <div class="flex-1 min-w-0 flex flex-col opacity-[0.38] pointer-events-none grayscale-[40%] transition-all duration-[450ms]" id="col2">
+      <div class="flex-1 flex flex-col bg-white border border-abu/40 rounded-3xl shadow-[0_2px_6px_rgba(0,0,0,0.04),0_12px_36px_rgba(0,0,0,0.07)] p-6">
+
+        <!-- head -->
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-[42px] h-[42px] rounded-[13px] bg-orpd/10 flex items-center justify-center text-lg shrink-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F9A61A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+          </div>
+          <div>
+            <h2 class="text-[17px] font-bold -tracking-[.2px]">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orpd text-white text-[11px] font-extrabold mr-1.5 align-middle shrink-0">2</span>
+              WiFi Setup
+            </h2>
+            <p class="text-[12px] text-[#6E6E73] mt-0.5">Konfigurasi WiFi setelah flash</p>
+          </div>
+        </div>
+
+        <!-- Reset note -->
+        <div class="text-[12px] text-[#6E6E73] bg-[#fff8f0] border border-[#fac775] rounded-xl px-3 py-[9px] mb-4 leading-relaxed">
+          Setelah flash selesai, tekan <b class="text-redpd">RESET (EN)</b> di ESP32, tunggu 2 detik, lalu klik <b class="text-redpd">Connect Serial</b> di bawah.
+        </div>
+
+        <!-- Serial -->
+        <div class="mb-[18px] last:mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Serial</div>
+          <button class="btn-ghost" id="btnWSerial" onclick="toggleWSerial()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="16 2 12 6 8 2"/></svg>
+            Connect Serial
+          </button>
+          <div class="flex items-center gap-2 mt-2 text-[12px] text-[#6E6E73]">
+            <span class="dot" id="wSerialDot"></span>
+            <span id="wSerialLabel">Not connected</span>
+          </div>
+        </div>
+
+        <!-- Credentials -->
+        <div class="mb-[18px] last:mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">WiFi Credentials</div>
+          <input type="text"     id="wSSID" placeholder="SSID / Nama WiFi" class="inp mb-1.5" autocomplete="off" spellcheck="false" />
+          <input type="password" id="wPass" placeholder="Password" class="inp" autocomplete="off" />
+          <div class="flex gap-2 mt-2">
+            <button class="btn-secondary flex-1" id="btnWConn" disabled onclick="sendWifi()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+              Connect
+            </button>
+            <button class="btn-ghost-sm" id="btnWStat" disabled onclick="getWStat()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Status
+            </button>
+          </div>
+        </div>
+
+        <!-- Status + IP -->
+        <div id="wBannerWrap"></div>
+        <div class="bg-[#f8f8fb] border border-abu/40 rounded-xl px-[14px] py-[10px] mb-[10px]" id="wIpWrap" style="display:none">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.04em] mb-1">Dashboard</div>
+          <a class="font-bold text-[15px] no-underline hover:underline text-redpd" id="wIpLink" href="#" target="_blank">http://<span id="wIpAddr"></span></a>
+        </div>
+
+        <!-- Terminal -->
+        <div class="mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Terminal</div>
+          <div class="bg-[#0d1117] border border-[#30363d] rounded-xl px-3 py-[10px] font-mono text-[11px] leading-relaxed max-h-[170px] overflow-y-auto whitespace-pre-wrap break-all min-h-[64px] scrollbar-thin" id="wTerm"></div>
+        </div>
+
+      </div>
+    </div><!-- /col2 -->
+
+    <!-- ================================================================
+         COL 3 &mdash; LLM
+         ================================================================ -->
+    <div class="flex-1 min-w-0 flex flex-col opacity-[0.38] pointer-events-none grayscale-[40%] transition-all duration-[450ms]" id="col3">
+
+      <!-- LLM card -->
+      <div class="flex-1 flex flex-col bg-white border border-abu/40 rounded-3xl shadow-[0_2px_6px_rgba(0,0,0,0.04),0_12px_36px_rgba(0,0,0,0.07)] p-6" id="llmCard">
+
+        <!-- head -->
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-[42px] h-[42px] rounded-[13px] bg-[#e8e4f0] flex items-center justify-center text-lg shrink-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#533AB7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <div>
+            <h2 class="text-[17px] font-bold -tracking-[.2px]">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#533AB7] text-white text-[11px] font-extrabold mr-1.5 align-middle shrink-0">3</span>
+              LLM Setup
+            </h2>
+            <p class="text-[12px] text-[#6E6E73] mt-0.5">Konfigurasi AI model ke ESP32</p>
+          </div>
+        </div>
+
+        <!-- Serial -->
+        <div class="mb-[18px] last:mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Serial</div>
+          <button class="btn-ghost" id="btnLSerial" onclick="toggleLSerial()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="16 2 12 6 8 2"/></svg>
+            Connect Serial
+          </button>
+          <div class="flex items-center gap-2 mt-2 text-[12px] text-[#6E6E73]">
+            <span class="dot" id="lSerialDot"></span>
+            <span id="lSerialLabel">Not connected</span>
+          </div>
+        </div>
+
+        <!-- LLM config -->
+        <div class="mb-[18px] last:mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">LLM Config</div>
+          <input type="text"     id="lUrl"   value="https://ai.sumopod.com/v1/chat/completions" placeholder="API URL"   class="inp mb-1.5" spellcheck="false" autocomplete="off" />
+          <input type="password" id="lKey"   placeholder="API Key"  class="inp mb-1.5" autocomplete="off" />
+          <input type="text"     id="lModel" value="gpt-4o-mini"    placeholder="Model"        class="inp mb-1.5" spellcheck="false" autocomplete="off" />
+          <div class="flex gap-2 mt-2">
+            <button class="btn-secondary flex-1" id="btnLSave" disabled onclick="saveLLM()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save Config
+            </button>
+            <button class="btn-ghost-sm" id="btnLTest" disabled onclick="testLLM()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Test
+            </button>
+          </div>
+        </div>
+
+        <!-- Terminal -->
+        <div class="mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.06em] mb-2">Terminal</div>
+          <div class="bg-[#0d1117] border border-[#30363d] rounded-xl px-3 py-[10px] font-mono text-[11px] leading-relaxed max-h-[170px] overflow-y-auto whitespace-pre-wrap break-all min-h-[64px] scrollbar-thin" id="lTerm"></div>
+        </div>
+
+      </div>
+
+      <!-- Success card -->
+      <div class="bg-white border border-abu/40 rounded-3xl shadow-[0_2px_6px_rgba(0,0,0,0.04),0_12px_36px_rgba(0,0,0,0.07)] text-center p-7" id="successCard" style="display:none">
+        <div class="w-14 h-14 rounded-full bg-[#e6f7e6] border-2 border-[#b7dfb8] flex items-center justify-center mx-auto mb-4 text-2xl">&#10003;</div>
+        <h2 class="text-xl font-extrabold mb-1">ArduClaw <span class="text-redpd">Siap!</span></h2>
+        <p class="text-[13px] text-[#6E6E73] mb-5">Firmware ter-install &amp; semua konfigurasi selesai</p>
+        <div class="bg-[#f8f8fb] border border-abu/40 rounded-xl px-[14px] py-[10px] text-left mb-0">
+          <div class="text-[11px] font-bold text-[#6E6E73] uppercase tracking-[.04em] mb-1">Buka Dashboard</div>
+          <a class="font-bold text-[15px] no-underline hover:underline text-redpd" id="succIpLink" href="#" target="_blank">http://<span id="succIpAddr"></span></a>
+        </div>
+        <p class="mt-4 text-[12px] text-[#AEAEB2]">ESP32 siap digunakan dengan AI Automation Runtime</p>
+        <button class="btn-ghost-sm mx-auto mt-4" onclick="resetAll()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.85"/></svg>
+          Flash Device Baru
+        </button>
+      </div>
+
+    </div><!-- /col3 -->
+
+  </div><!-- /cols -->
+
+
+  <!-- ================================================================
+       Shared Styles
+       ================================================================ -->
+  <style>
+    .dot{width:7px;height:7px;border-radius:50%;background:#AEAEB2;flex-shrink:0;transition:background .25s,box-shadow .25s}
+    .dot.on{background:#3fb950;box-shadow:0 0 0 3px rgba(63,185,80,0.2)}
+    .dot.busy{background:#F31D1C;animation:pulse-dot .75s ease-in-out infinite}
+
+    .btn-primary,.btn-secondary,.btn-ghost,.btn-ghost-sm{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;cursor:pointer;transition:all .15s;font-weight:700;font-family:'Nunito',system-ui,sans-serif}
+    .btn-primary,.btn-secondary,.btn-ghost{width:100%;padding:10px 16px;border-radius:12px;font-size:14px}
+    .btn-ghost-sm{padding:8px 16px;border-radius:10px;font-size:13px}
+    .btn-primary{background:#F31D1C;color:#fff}
+    .btn-primary:hover:not(:disabled){background:#d0100f}
+    .btn-secondary{background:#F9A61A;color:#fff}
+    .btn-secondary:hover:not(:disabled){background:#e09000}
+    .btn-ghost,.btn-ghost-sm{background:#f0f0f4;color:#171717;border:1px solid rgba(0,0,0,0.09)}
+    .btn-ghost:hover:not(:disabled),.btn-ghost-sm:hover:not(:disabled){background:#e4e4ea}
+    .btn-primary:disabled,.btn-secondary:disabled,.btn-ghost:disabled,.btn-ghost-sm:disabled{opacity:.35;cursor:not-allowed}
+
+    .inp{width:100%;padding:9px 13px;background:#f8f8fb;border:1px solid rgba(0,0,0,0.09);border-radius:11px;font-size:14px;font-family:'Nunito',system-ui,sans-serif;color:#171717;outline:none;transition:border-color .15s}
+    .inp:focus{border-color:#F31D1C}
+    .inp::placeholder{color:#AEAEB2}
+
+    .banner{display:flex;align-items:center;gap:8px;padding:9px 13px;border-radius:11px;font-size:13px;font-weight:700;margin-bottom:10px}
+    .ban-ok{background:#e6f7e6;color:#2d8a2d;border:1px solid #b7dfb8}
+    .ban-err{background:#fcebeb;color:#a32d2d;border:1px solid #f09595}
+    .ban-busy{background:#fff8f0;color:#7a4a00;border:1px solid #fac775}
+
+    #col2.unlocked,#col3.unlocked{opacity:1;pointer-events:all;filter:none}
+
+    @media(max-width:1023px){.cols{flex-direction:column}.col,.col-locked{max-width:100%}}
+  </style>
+
+  <!-- ================================================================
+       Scripts
+       ================================================================ -->
+  <script src="firmware.js" onerror="void(0)"></script>
+  <script type="module">
+    import { ESPLoader } from 'https://unpkg.com/esptool-js@0.6.0/bundle.js';
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let flashPort    = null;
+    let loader       = null;
+    let selectedFile = null;
+    let isFlashing   = false;
+
+    let wPort      = null;
+    let wReader    = null;
+    let wWriter    = null;
+    let wReading   = false;
+    let serialOwner = 'wifi';
+
+    const $ = id => document.getElementById(id);
+
+    window.toggleConn    = toggleConn;
+    window.onFileChange  = onFileChange;
+    window.dlFw          = dlFw;
+    window.doFlash       = doFlash;
+    window.doErase       = doErase;
+    window.toggleWSerial = toggleWSerial;
+    window.sendWifi      = sendWifi;
+    window.getWStat      = getWStat;
+    window.toggleLSerial = toggleLSerial;
+    window.saveLLM       = saveLLM;
+    window.testLLM       = testLLM;
+    window.resetAll      = resetAll;
+
+    // ── Flash log helpers ────────────────────────────────────────────────────
+    function flog(msg, t = 'dim') {
+      const el = $('flashLog');
+      el.innerHTML += '\n<span class="text-' + ({
+        dim: '[#484f58]', ok: '[#3fb950]', err: '[#f85149]',
+        info: '[#58a6ff]', warn: '[#d29922]'
+      }[t] || '[#484f58]') + ' block">' +
+        msg.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setProg(p) { $('prog').style.width = Math.min(p, 100) + '%'; }
+
+    function unlockCol2() { $('col2').classList.add('unlocked'); }
+    function unlockCol3() { $('col3').classList.add('unlocked'); }
+
+    // ── Flash connection state ────────────────────────────────────────────────
+    function setFlashConn(on) {
+      $('flashDot').className      = 'dot ' + (on ? 'on' : '');
+      $('flashLabel').textContent  = on ? 'Connected' : 'Not connected';
+      $('btnConnect').innerHTML    = on
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Disconnect`
+        : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg> Connect to Device`;
+      $('btnConnect').className    = on ? 'btn-secondary' : 'btn-ghost';
+      $('btnFlash').disabled       = !on || !selectedFile;
+      $('btnErase').disabled       = !on;
+    }
+
+    function setFlashBusy(b) {
+      $('flashDot').className = 'dot ' + (b ? 'busy' : 'on');
+      $('btnFlash').disabled  = b || !selectedFile;
+      $('btnErase').disabled  = b;
+    }
+
+    // ── connect esptool ───────────────────────────────────────────────────────
+    async function toggleConn() {
+      if (flashPort) await disconnFlash();
+      else await connFlash();
+    }
+
+    async function connFlash() {
+      try {
+        if (!('serial' in navigator)) { flog('Web Serial API not supported. Use Chrome or Edge.', 'err'); return; }
+        flashPort = await navigator.serial.requestPort();
+        const terminal = { clean: () => {}, write: d => { if (d && d.trim()) flog(d.trim(), 'dim'); }, writeLine: d => { if (d && d.trim()) flog(d.trim(), 'dim'); } };
+        loader = new ESPLoader({ port: flashPort, baudrate: 115200, terminal, enableTracing: false });
+        await loader.main();
+        flog('Connected to ESP32', 'ok');
+        setFlashConn(true);
+      } catch (err) {
+        flog('Connection failed: ' + err.message, 'err');
+        await safeDiscFlash();
+        setFlashConn(false);
+      }
+    }
+
+    async function safeDiscFlash() {
+      try { if (loader && loader.transport) await loader.transport.disconnect(); else if (flashPort) { try { await flashPort.close(); } catch (_) {} } } catch (_) {}
+      flashPort = null; loader = null;
+    }
+
+    async function disconnFlash() { await safeDiscFlash(); setFlashConn(false); flog('Disconnected', 'warn'); }
+
+    // ── Firmware file ────────────────────────────────────────────────────────
+    function selectFile(f) {
+      selectedFile = f;
+      $('fileName').textContent = f.name;
+      $('fileSize').textContent = (f.size / 1024).toFixed(1) + ' KB';
+      flog('Firmware: ' + f.name + ' (' + (f.size / 1024).toFixed(1) + ' KB)', 'info');
+      if (flashPort) $('btnFlash').disabled = false;
+    }
+
+    function onFileChange(e) { const f = e.target.files[0]; if (f) selectFile(f); }
+
+    function autoFw() {
+      const d = window.FIRMWARE_DATA;
+      if (d && d.b64) {
+        const bin = atob(d.b64), bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        selectFile(new File([bytes], d.name, { lastModified: Date.now() }));
+        flog('Firmware built-in: ' + d.name, 'ok');
+      } else { flog('No built-in firmware \u2014 use Change button.', 'warn'); }
+    }
+
+    function dlFw() {
+      const d = window.FIRMWARE_DATA;
+      if (!d || !d.b64) { flog('No firmware to download', 'warn'); return; }
+      const bin = atob(d.b64), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      Object.assign(document.createElement('a'), { href: url, download: d.name }).click();
+      URL.revokeObjectURL(url);
+      flog('Downloading ' + d.name, 'info');
+    }
+
+    // ── Flash ────────────────────────────────────────────────────────────────
+    async function doFlash() {
+      if (!loader || !selectedFile || isFlashing) return;
+      isFlashing = true; setFlashBusy(true); setProg(0);
+      try {
+        flog('Starting flash...', 'info'); setProg(5);
+        const fwBytes = new Uint8Array(await selectedFile.arrayBuffer());
+        flog('Size: ' + (fwBytes.length / 1024).toFixed(1) + ' KB', 'info'); setProg(10);
+        await loader.writeFlash({
+          fileArray: [{ address: 0x0, data: fwBytes }],
+          flashMode: 'keep', flashFreq: 'keep', flashSize: 'keep',
+          eraseAll: false, compress: true, calculateMD5Hash: false,
+          reportProgress: pct => setProg(10 + Math.floor(pct * 0.85))
+        });
+        setProg(96); flog('Flash complete. Rebooting...', 'ok');
+        await loader.after('hard_reset'); setProg(100);
+        flog('Firmware flashed successfully!', 'ok');
+        flog('Tekan RESET (EN) di ESP32, lalu configure WiFi \u2192', 'info');
+        await new Promise(r => setTimeout(r, 1500));
+        await safeDiscFlash(); setFlashConn(false); unlockCol2();
+      } catch (err) { flog('Flash failed: ' + err.message, 'err'); setProg(0); }
+      isFlashing = false; setFlashBusy(false);
+    }
+
+    // ── Erase ────────────────────────────────────────────────────────────────
+    async function doErase() {
+      if (!loader || isFlashing) return;
+      if (!confirm('Erase semua flash? Tidak bisa dibatalkan.')) return;
+      isFlashing = true; setFlashBusy(true); setProg(0);
+      try {
+        flog('Erasing flash...', 'warn'); setProg(10);
+        await loader.eraseFlash(); setProg(90);
+        flog('Erased. Rebooting...', 'warn');
+        await loader.after('hard_reset'); setProg(100);
+        flog('Flash erased.', 'ok');
+      } catch (err) { flog('Erase failed: ' + err.message, 'err'); setProg(0); }
+      isFlashing = false; setFlashBusy(false);
+    }
+
+    // ── Terminal helpers ──────────────────────────────────────────────────────
+    function wterm(txt, cls) { const el=$('wTerm'),s=document.createElement('span');s.className=cls||'text-[#484f58] block';s.textContent=txt+'\n';el.appendChild(s);el.scrollTop=el.scrollHeight; }
+    function lterm(txt, cls) { const el=$('lTerm'),s=document.createElement('span');s.className=cls||'text-[#484f58] block';s.textContent=txt+'\n';el.appendChild(s);el.scrollTop=el.scrollHeight; }
+    function anyterm(txt, cls) { wterm(txt, cls); lterm(txt, cls); }
+
+    function setBanner(type, msg) {
+      const w = $('wBannerWrap');
+      if (!type || type === 'idle') { w.innerHTML = ''; return; }
+      const clsMap = { ok: 'ban-ok', err: 'ban-err', busy: 'ban-busy' };
+      const iconMap = { ok: '\u2713', err: '\u2717', busy: '\u2026' };
+      w.innerHTML = `<div class="banner ${clsMap[type]||'ban-busy'}">${iconMap[type]||'\u2026'} ${msg}</div>`;
+    }
+
+    function toast(msg, type) {
+      const box = $('toastBox'); if (!box) return;
+      const clsMap = { ok: 'bg-[#e6f7e6] text-[#2d8a2d] border-[#b7dfb8]', err: 'bg-[#fcebeb] text-[#a32d2d] border-[#f09595]', busy: 'bg-[#fff8f0] text-[#7a4a00] border-[#fac775]' };
+      const iconMap = { ok: '\u2713', err: '\u2717', busy: '\u2026' };
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[13px] font-bold shadow-lg animate-[fadeUp_.3s_ease_both] ${clsMap[type]||clsMap.busy}`;
+      el.innerHTML = `${iconMap[type]||'\u2026'} ${msg}`;
+      box.appendChild(el);
+      setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(() => el.remove(), 300); }, 3500);
+    }
+
+    function showWifiIp(ip) { $('wIpWrap').style.display='block'; $('wIpAddr').textContent=ip; $('wIpLink').href='http://'+ip; }
+    function showSuccess(ip) { $('llmCard').style.display='none'; $('successCard').style.display='block'; $('succIpAddr').textContent=ip; $('succIpLink').href='http://'+ip; }
+
+    function setWSConn(on) {
+      $('wSerialDot').className='dot '+(on?'on':''); $('wSerialLabel').textContent=on?'Connected':'Not connected';
+      $('btnWSerial').innerHTML=on
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Disconnect`
+        : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="16 2 12 6 8 2"/></svg> Connect Serial`;
+      $('btnWSerial').className=on?'btn-secondary':'btn-ghost'; $('btnWConn').disabled=!on; $('btnWStat').disabled=!on;
+    }
+
+    function setLSConn(on) {
+      $('lSerialDot').className='dot '+(on?'on':''); $('lSerialLabel').textContent=on?'Connected':'Not connected';
+      $('btnLSerial').innerHTML=on
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Disconnect`
+        : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="16 2 12 6 8 2"/></svg> Connect Serial`;
+      $('btnLSerial').className=on?'btn-secondary':'btn-ghost'; $('btnLSave').disabled=!on; $('btnLTest').disabled=!on;
+    }
+
+    // ── ESP line parser ──────────────────────────────────────────────────────
+    function handleEspLine(raw) {
+      const t = raw.trim(); if (!t) return;
+      if (t.startsWith('{') || t.startsWith('[')) {
+        try {
+          const j = JSON.parse(t); const ok = j.ok === true || j.ok === 'true'; const msg = j.msg || '';
+          anyterm(t, ok ? 'text-[#3fb950] block' : 'text-[#f85149] block');
+          if (msg === 'wifi_saved_connecting') toast('Config tersimpan, connecting...', 'busy');
+          else if (msg === 'wifi_connected') { toast('WiFi Connected!', 'ok'); unlockCol3(); }
+          else if (msg === 'wifi_failed') toast('Gagal konek WiFi \u2014 cek SSID/password', 'err');
+          else if (msg === 'config_cleared') toast('Config dihapus', 'ok');
+          else if (msg === 'config_loaded') toast('Config ditemukan, menghubungkan...', 'busy');
+          else if (msg === 'restarting') toast('Restarting...', 'busy');
+          else if (msg === 'missing_ssid' || msg === 'bad_json') toast('Format command salah', 'err');
+          else if (msg === 'llm_saved') lterm('LLM config saved \u2713', 'text-[#3fb950] block');
+          else if (msg === 'llm_wait') lterm('LLM: memproses...', 'text-[#58a6ff] block');
+          else if (msg === 'llm_ok') { const reply = j.reply || ''; if (reply) lterm('LLM reply: ' + reply, 'text-[#3fb950] block'); if (j.ip) showSuccess(j.ip); }
+          else if (msg === 'started' && j.ip) { lterm('Server started!', 'text-[#3fb950] block'); showSuccess(j.ip); }
+          else if (msg === 'wifi_not_connected') lterm('[ERR] WiFi belum konek', 'text-[#f85149] block');
+          else if (msg === 'api_key_missing') lterm('[ERR] API Key belum diisi', 'text-[#f85149] block');
+          else if (msg === 'ready') anyterm('ESP32 ready', 'text-[#3fb950] block');
+          if (j.ssid !== undefined) { if (j.connected) { toast('Connected \u00b7 IP: ' + (j.ip||'?'), 'ok'); unlockCol3(); } }
+          return;
+        } catch (_) {}
+      }
+      let cls = 'text-[#484f58] block';
+      if (t.startsWith('[WiFi]')||t.startsWith('[NVS]')) cls = 'text-[#58a6ff] block';
+      if (t.startsWith('[CMD]'))   cls = 'text-[#F9A61A] block';
+      if (t.startsWith('[ERR]'))   cls = 'text-[#f85149] block';
+      if (t.startsWith('[OK]')||t.includes('Connected!')) cls = 'text-[#3fb950] block';
+      if (t.includes('Failed'))   cls = 'text-[#f85149] block';
+      anyterm(t, cls);
+      if (t.includes('Connected!') || t.includes('[WIFI] Connected:')) { toast('WiFi Connected!', 'ok'); unlockCol3(); }
+      const ipm = t.match(/(\d+\.\d+\.\d+\.\d+)/);
+      if (ipm && (t.includes('IP') || t.includes('[WIFI] Connected:'))) unlockCol3();
+    }
+
+    // ── Serial read/write ────────────────────────────────────────────────────
+    async function startRead() {
+      const dec = new TextDecoder(); wReading = true; let lineBuffer = '';
+      try {
+        while (wReading) {
+          let result;
+          try { result = await wReader.read(); } catch (err) { if (wReading) anyterm('[Serial stopped: ' + err.message + ']', 'text-[#f85149] block'); break; }
+          if (result.done) break;
+          if (!result.value || result.value.length === 0) continue;
+          const txt = dec.decode(result.value, { stream: true }); lineBuffer += txt;
+          const lines = lineBuffer.split('\n'); lineBuffer = lines.pop();
+          for (const line of lines) handleEspLine(line);
+          if (window._probeResolve && (txt.includes('"ok":true') || txt.includes('[OK]') || txt.includes('"ready"'))) { window._probeResolve(true); window._probeResolve = null; }
+        }
+      } finally { wReading = false; }
+    }
+
+    async function connSerial() {
+      try {
+        if (!('serial' in navigator)) { anyterm('[ERR] Web Serial tidak didukung. Pakai Chrome/Edge.', 'text-[#f85149] block'); return; }
+        wPort = await navigator.serial.requestPort();
+        anyterm('Membuka port serial...', 'text-[#484f58] block');
+        await wPort.open({ baudRate: 115200, bufferSize: 4096 });
+        if (!wPort.readable || !wPort.writable) throw new Error('Port streams unavailable');
+        wReader = wPort.readable.getReader(); wWriter = wPort.writable.getWriter();
+        startRead();
+        anyterm('Handshake dengan ESP32...', 'text-[#484f58] block');
+        const probePromise = new Promise(r => { window._probeResolve = r; });
+        const probeTimer = setInterval(async () => { try { await wWriter.ready; await wWriter.write(new TextEncoder().encode('\r\n')); } catch (_) {} }, 500);
+        const ok = await Promise.race([probePromise, new Promise(r => setTimeout(() => r(false), 6000))]);
+        clearInterval(probeTimer); window._probeResolve = null;
+        anyterm(ok ? 'ESP32 siap! Serial dua arah aktif.' : 'ESP belum merespons \u2014 lanjut manual.', ok ? 'text-[#3fb950] block' : 'text-[#d29922] block');
+        if (serialOwner === 'llm') setLSConn(true); else setWSConn(true);
+      } catch (err) { anyterm('[ERR] ' + err.message, 'text-[#f85149] block'); await discSerial(); }
+    }
+
+    async function discSerial(silent) {
+      wReading = false;
+      if (wReader) { try { wReader.cancel(); } catch(_) {} try { wReader.releaseLock(); } catch(_) {} wReader = null; }
+      if (wWriter) { try { wWriter.releaseLock(); } catch(_) {} wWriter = null; }
+      if (wPort) { await new Promise(r => setTimeout(r, 120)); try { await wPort.close(); } catch(_) {} wPort = null; }
+      setWSConn(false); setLSConn(false);
+      if (!silent) anyterm('Serial disconnected.', 'text-[#484f58] block');
+    }
+
+    async function toggleWSerial() { if (wPort) await discSerial(); else { serialOwner='wifi'; await connSerial(); } }
+    async function toggleLSerial() { if (wPort) await discSerial(); else { serialOwner='llm'; await connSerial(); } }
+
+    async function txJSON(obj) {
+      if (!wWriter) { anyterm('[ERR] Belum konek serial', 'text-[#f85149] block'); return; }
+      try { const s=JSON.stringify(obj); await wWriter.ready; await wWriter.write(new TextEncoder().encode(s+'\n')); anyterm('\u2192 '+s, 'text-[#F9A61A] block'); }
+      catch (err) { anyterm('[ERR] Kirim gagal: '+err.message, 'text-[#f85149] block'); }
+    }
+
+    // ── WiFi actions ─────────────────────────────────────────────────────────
+    async function sendWifi() {
+      const s=$('wSSID').value.trim(), p=$('wPass').value.trim();
+      if (!s) { anyterm('[ERR] SSID kosong', 'text-[#f85149] block'); return; }
+      toast('Mengirim config...', 'busy'); await txJSON({ c:'ws', s, p });
+    }
+
+    async function getWStat() { await txJSON({ c:'wst' }); }
+
+    // ── LLM actions ──────────────────────────────────────────────────────────
+    async function saveLLM() {
+      const url=$('lUrl').value.trim(), key=$('lKey').value.trim(), model=$('lModel').value.trim();
+      if (!url) { lterm('[ERR] URL kosong', 'text-[#f85149] block'); return; }
+      if (!key) { lterm('[ERR] API Key kosong', 'text-[#f85149] block'); return; }
+      await txJSON({ c:'llm_set', url, key, model });
+    }
+
+    async function testLLM() { await txJSON({ c:'llm_test' }); }
+
+    // ── Reset ─────────────────────────────────────────────────────────────────
+    function resetAll() {
+      $('llmCard').style.display='block'; $('successCard').style.display='none';
+      $('col2').classList.remove('unlocked'); $('col3').classList.remove('unlocked');
+      $('wTerm').innerHTML=''; $('lTerm').innerHTML=''; $('wBannerWrap').innerHTML=''; $('wIpWrap').style.display='none';
+      setProg(0); flog('\u2500\u2500\u2500 Reset \u2014 siap flash device baru \u2500\u2500\u2500', 'warn');
+    }
+
+    // ── Init ──
+    flog('ArduClaw Flasher v0.7 ready', 'dim');
+    autoFw();
+  </script>
+
+  <!-- footer -->
+  <footer class="relative z-10 w-full border-t border-abu/20 bg-white/40 backdrop-blur-sm mt-12">
+    <div class="max-w-[1120px] mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-[#8E8E93]">
+      <div class="flex items-center gap-2">
+        <span>&copy; 2026</span>
+        <a href="https://avisha.id/arduclaw" class="font-bold text-hitam hover:text-redpd transition-colors no-underline">ArduClaw</a>
+        <span>by</span>
+        <a href="https://instagram.com/ajangrahmat" class="font-bold text-hitam hover:text-redpd transition-colors no-underline" target="_blank">AjangRahmat</a>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="hover:text-hitam transition-colors no-underline">Home</a>
+        <a href="flash.html" class="hover:text-hitam transition-colors no-underline">Flash</a>
+        <a href="docs.html" class="hover:text-hitam transition-colors no-underline">Docs</a>
+        <a href="flash-en.html" class="hover:text-hitam transition-colors no-underline">English</a>
+        <a href="https://github.com/ajangrahmat/arduclaw" class="hover:text-hitam transition-colors no-underline" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
