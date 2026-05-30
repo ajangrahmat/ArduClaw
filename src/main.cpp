@@ -302,8 +302,11 @@ static void loadMqttConfig() {
     user.toCharArray(mqttUser, sizeof(mqttUser));
     pass.toCharArray(mqttPass, sizeof(mqttPass));
     cid.toCharArray(mqttClientId, sizeof(mqttClientId));
-    mqttConfigured = true;
+  } else {
+    strncpy(mqttHost, "broker.emqx.io", sizeof(mqttHost) - 1);
+    mqttPort = 1883;
   }
+  mqttConfigured = true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -727,8 +730,10 @@ static void llmCallTask(void* param) {
       "Saat diminta kontrol hardware, SELALU balas HANYA dengan JSON valid:\n"
       "{\"response\": \"penjelasan singkat\", \"skills\": [{\"tool\": \"nama\", \"args\": {...}}]}\n"
       "\nDaftar skills yang tersedia:\n"
-      "  gpio.write       {pin:int, value:bool}                 — tulis HIGH/LOW\n"
+      "  gpio.write       {pin:int, value:bool/string}          — tulis HIGH/LOW. value string '5'/'42' → >0=ON, 0=OFF\n"
       "  gpio.read        {pin:int}                             — baca nilai pin\n"
+      "  gpio.toggle      {pin:int}                             — balik state pin (ON⇄OFF)\n"
+      "  gpio.pulse       {pin:int, ms:int, start:bool}         — pulse ON→OFF (default start=true) dalam ms\n"
       "  gpio.mode        {pin:int, mode:string}                — set mode pin (output/input/input_pullup)\n"
       "  gpio.blink       {pin:int, on_ms:int, off_ms:int, count:int} — kedip N kali lalu berhenti\n"
       "  gpio.blink_start {pin:int, on_ms:int, off_ms:int}     — mulai kedip terus-menerus (non-blocking)\n"
@@ -737,11 +742,22 @@ static void llmCallTask(void* param) {
       "  gpio.monitor_stop {pin:int}                            — hentikan monitor (tanpa pin = stop semua)\n"
       "  adc.read              {pin:int}                             — baca ADC (gunakan pin 32-39)\n"
       "  system.status         {}                                    — status sistem\n"
+      "  system.restart        {}                                    — restart ESP32 (delay 1,5 detik)\n"
+      "  system.wifi           {}                                    — info WiFi (SSID, RSSI, IP, MAC, channel)\n"
       "  system.clear_persist  {}                                    — hapus logika. Reboot → tidak ada logika sama sekali\n"
+      "  system.reset_factory  {}                                    — factory reset. Reboot → benar-benar kosong, tidak ada logika\n"
       "  mqtt.publish       {topic:string, payload:string}           — kirim pesan ke MQTT broker\n"
       "  mqtt.subscribe     {topic:string, action:string, action_args:obj} — subscribe topic, jalankan action saat pesan masuk. Gunakan {PAYLOAD} di action_args untuk menyisipkan isi pesan MQTT, contoh: {\"pin\":27,\"value\":\"{PAYLOAD}\"}\n"
+      "  mqtt.gpio_bridge   {topic:string, pin:int}                  — subscribe topic, parse int payload: >0→pin HIGH, 0→pin LOW\n"
       "  mqtt.unsubscribe   {topic:string}                           — unsubscribe topic (kosongkan = hapus semua)\n"
-      "  system.reset_factory  {}                                    — factory reset. Reboot → benar-benar kosong, tidak ada logika\n"
+      "  mqtt.publish_on_change {pin:int, topic:string, high_msg:string, low_msg:string} — pantau pin, publish HIGH/LOW ke topic saat berubah\n"
+      "  gpio.write_pwm {pin:int, duty:int, freq:int}          — output PWM (duty 0-255, freq Hz, default 5000)\n"
+      "  gpio.servo     {pin:int, angle:int}                   — kontrol servo (angle 0-180°)\n"
+      "  gpio.debounce  {pin:int, ms:int, action:string, action_args:obj} — baca tombol anti-bouncing (ms default 50)\n"
+      "  system.memory  {}                                      — lihat sisa heap RAM\n"
+      "  system.sleep   {seconds:int, wake_pin:int}             — deep sleep (wake_pin optional, LOW trigger)\n"
+      "  file.write     {path:string, content:string}           — simpan file (max ~4KB per file via NVS)\n"
+      "  file.read      {path:string}                           — baca file\n"
       "\nAturan pemilihan skill blink:\n"
       "  - 'kedip X kali' → gpio.blink dengan count=X\n"
       "  - 'kedip terus' / 'blink loop' / tanpa jumlah → gpio.blink_start\n"
@@ -758,8 +774,9 @@ static void llmCallTask(void* param) {
       "  - 'reset ke factory default' → gpio.monitor_stop {} lalu system.reset_factory {}. Reboot → kosong total\n"
       "  - 'LED pin 27 nyala' → gpio.write {pin:27, value:true}\n"
       "  - 'baca suhu' → adc.read {pin:34}\n"
-      "  - 'mqtt subscribe hello/test → gpio.write pin 27 on/off' → mqtt.subscribe {topic:'hello/test', action:'gpio.write', action_args:{pin:27, value:'{PAYLOAD}'}}\n"
+  "  - 'mqtt subscribe hello/test → gpio.write pin 27 on/off' → mqtt.subscribe {topic:'hello/test', action:'gpio.write', action_args:{pin:27, value:'{PAYLOAD}'}}\n"
       "  - 'terima data mqtt topik X on/off ke pin Y' → mqtt.subscribe {topic:'X', action:'gpio.write', action_args:{pin:Y, value:'{PAYLOAD}'}}\n"
+      "  - 'mqtt terima data dari topik Z nilai angka ke pin 27, >0 nyala 0 mati' → mqtt.gpio_bridge {topic:'Z', pin:27}\n"
       "\nPin 0,2,5,12,15 adalah strapping pin (hanya peringatan, tetap bisa dipakai).\n"
       "Balas HANYA JSON valid, tanpa markdown, tanpa teks di luar JSON.";
 
@@ -1004,6 +1021,21 @@ static void handleSkillsList() {
   sendDoc.clear();
   sendDoc["ok"]     = true;
   sendDoc["skills"] = skill::listSkills();
+  String json; serializeJson(sendDoc, json);
+  server.send(200, "application/json", json);
+}
+
+static void handleApiPersist() {
+  sendDoc.clear();
+  sendDoc["ok"] = true;
+  // Parse JSON string from skill::persistJson() into sendDoc
+  String raw = skill::persistJson();
+  JsonDocument d;
+  deserializeJson(d, raw);
+  for (JsonPair kv : d.as<JsonObject>()) {
+    sendDoc[kv.key()] = kv.value();
+  }
+  sendDoc["has_config"] = skill::hasPersistentConfig();
   String json; serializeJson(sendDoc, json);
   server.send(200, "application/json", json);
 }
@@ -1303,6 +1335,7 @@ static void startWebServer() {
   server.on("/mqtt",       handleMqttPage);
   server.on("/skills",     handleSkillsPage);
   server.on("/api/status",        HTTP_GET,  handleApiStatus);
+  server.on("/api/persist",       HTTP_GET,  handleApiPersist);
   server.on("/api/skills",        HTTP_GET,  handleSkillsList);
   server.on("/api/skill/execute", HTTP_POST, handleSkillExecute);
   server.on("/api/skill/chain",   HTTP_POST, handleSkillChain);
@@ -1316,6 +1349,7 @@ static void startWebServer() {
   server.on("/api/mqtt/subs",     HTTP_GET,  handleApiMqttSubs);
   server.on("/api/mqtt/subs/add", HTTP_POST, handleApiMqttSubAdd);
   server.on("/api/mqtt/subs/remove", HTTP_POST, handleApiMqttSubRemove);
+  server.on("/api/persist",       HTTP_GET,  handleApiPersist);
   server.begin();
   serverStarted = true;
 }
@@ -1510,7 +1544,7 @@ void setup() {
   loadMqttConfig();
 
   // ── Generate random MQTT client ID ──
-  if (!mqttConfigured || strlen(mqttClientId) == 0) {
+  if (strcmp(mqttClientId, "arduclaw") == 0 || strlen(mqttClientId) == 0) {
     snprintf(mqttClientId, sizeof(mqttClientId), "arduclaw-%06x",
              (unsigned long)esp_random() & 0xFFFFFF);
   }

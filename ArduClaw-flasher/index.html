@@ -2,14 +2,21 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ArduClaw — AI Automation Runtime</title>
+  <meta name="theme-color" content="#F31D1C" />
+  <title>ArduClaw - AI Automation Runtime</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="canonical" href="https://avisha.id/arduclaw/" />
-  <meta name="description" content="ArduClaw — AI Agent Runtime untuk board ESP32. Flash firmware, konfigurasi WiFi & LLM dari browser. Beta — support ESP32 DEV board." />
-  <meta property="og:title" content="ArduClaw — AI Agent Runtime untuk ESP32" />
+  <link rel="alternate" hreflang="id" href="https://avisha.id/arduclaw/" />
+  <link rel="alternate" hreflang="en" href="https://avisha.id/arduclaw/index-en.html" />
+  <link rel="alternate" hreflang="x-default" href="https://avisha.id/arduclaw/" />
+  <meta name="description" content="ArduClaw - AI Agent Runtime untuk board ESP32. Flash firmware, konfigurasi WiFi & LLM dari browser. Beta - support ESP32 DEV board." />
+  <meta property="og:title" content="ArduClaw - AI Agent Runtime untuk ESP32" />
   <meta property="og:description" content="Flash firmware, konfigurasi WiFi & LLM dalam satu alat. Jalan di board ESP32 DEV paling populer." />
   <meta property="og:image" content="https://avisha.id/arduclaw/maskot.webp" />
   <meta property="og:url" content="https://avisha.id/arduclaw/" />
@@ -25,7 +32,7 @@
     @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fadeScale{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
     .anim-float{animation:floatBlob 9s ease-in-out infinite}
-  </style>
+  </style>  <script>var t=localStorage.getItem('theme');if(t==='light')document.documentElement.className='';else if(t==='dark'||matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.className='dark';else document.documentElement.className='';function toggleTheme(){var h=document.documentElement;if(h.className==='dark'){h.className='';localStorage.setItem('theme','light')}else{h.className='dark';localStorage.setItem('theme','dark')}}</script>
 </head>
 <body class="bg-[#f5f5f7] min-h-screen font-nunito text-hitam antialiased overflow-x-hidden">
 
@@ -46,7 +53,7 @@
           <span class="text-[10px] font-medium text-abu tracking-[.03em] -mt-0.5">ArduMeka Claw AI Bot</span>
         </div>
       </a>
-      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors active:bg-redpd/20" style="-webkit-tap-highlight-color:transparent">
+      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors active:bg-redpd/20" aria-label="Buka menu navigasi" style="-webkit-tap-highlight-color:transparent">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <div class="hidden md:flex items-center gap-1 text-[15px] font-bold">
@@ -56,6 +63,10 @@
         <span class="w-px h-4 bg-abu/40 mx-1.5"></span>
         <a href="index.html" class="block px-2 py-1 rounded-lg bg-redpd/10 text-redpd text-[13px] font-bold transition-colors">ID</a>
         <a href="index-en.html" class="block px-2 py-1 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd text-[13px] font-bold transition-colors">EN</a>
+        <button onclick="toggleTheme()" class="p-1.5 ml-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" aria-label="Toggle dark mode">
+  <svg class="theme-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg class="theme-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </div>
     </div>
     <!-- mobile menu -->
@@ -66,6 +77,10 @@
       <div class="flex items-center gap-2 mt-1 pt-2 border-t border-abu/20 text-[13px] font-bold">
         <a href="index.html" class="block px-3 py-1 rounded-lg bg-redpd/10 text-redpd">ID</a>
         <a href="index-en.html" class="block px-3 py-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">EN</a>
+        <button onclick="toggleTheme()" class="p-1.5 ml-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" aria-label="Toggle dark mode">
+  <svg class="theme-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg class="theme-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </div>
     </div>
   </nav>
@@ -73,13 +88,13 @@
   <!-- hero -->
   <main class="relative z-10 flex flex-col items-center px-4 pt-10 md:pt-14 pb-16">
     <div class="animate-[fadeScale_.7s_ease_both] flex flex-col items-center text-center max-w-[680px]">
-      <img src="maskot.webp" alt="ArduClaw" class="h-28 md:h-36 w-auto mb-5 drop-shadow-[0_8px_32px_rgba(243,29,28,0.2)]" />
+      <img src="maskot.webp" alt="ArduClaw" class="h-28 md:h-36 w-auto mb-5 drop-shadow-[0_8px_32px_rgba(243,29,28,0.2)]" loading="lazy" />
       <h1 class="text-[36px] md:text-[52px] font-extrabold tracking-tight text-hitam leading-[1.1]">
         Ardu<span class="text-redpd">Claw</span>
       </h1>
       <p class="text-[16px] md:text-[17px] text-hitam mt-3 font-bold leading-relaxed max-w-[600px]">
         <strong class="text-redpd">AI Agent Runtime</strong> untuk <strong>ESP32</strong>.
-        <span class="text-[#6E6E73] font-medium">Bukan sekadar chat bot &mdash; ini sudah seperti <strong class="text-hitam">bahasa pemrograman baru</strong>
+        <span class="text-[#6E6E73] font-medium">Bukan sekadar chat bot: ini sudah seperti <strong class="text-hitam">bahasa pemrograman baru</strong>
         yang kamu tulis pakai <strong class="text-hitam">kalimat sehari-hari</strong>.</span>
       </p>
       <div class="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[14px] text-[#6E6E73] font-medium">
@@ -117,12 +132,12 @@
               <span class="text-[#6E6E73]">&gt; </span><span class="text-[#3fb950]">AI Agent</span>:<br>
               <span class="text-[#3fb950]">OK: mqtt.subscribe topic=rumah/lampu</span><br>
               <span class="text-[#3fb950]">     action=gpio.write pin=27 value={PAYLOAD}</span><br>
-              <span class="text-[#6E6E73]">Tersimpan di NVS &mdash; tetap ada walau ESP32 dimatikan.</span>
+              <span class="text-[#6E6E73]">Tersimpan di NVS: tetap ada walau ESP32 dimatikan.</span>
             </div>
           </div>
           <div class="flex-1 w-full text-[14px] text-[#6E6E73] leading-relaxed space-y-3">
-            <p><strong class="text-hitam">Kamu bilang apa yang mau terjadi</strong> &mdash; dalam bahasa Indonesia atau Inggris. AI Agent di ESP32 yang nerjemahin jadi eksekusi nyata.</p>
-            <p>Bikin logika <strong class="text-hitam">if/else</strong>, subscribe <strong class="text-hitam">MQTT</strong>, baca sensor, kontrol GPIO &mdash; semua dari chat, tanpa nulis C++.</p>
+            <p><strong class="text-hitam">Kamu bilang apa yang mau terjadi</strong>: dalam bahasa Indonesia atau Inggris. AI Agent di ESP32 yang nerjemahin jadi eksekusi nyata.</p>
+            <p>Bikin logika <strong class="text-hitam">if/else</strong>, subscribe <strong class="text-hitam">MQTT</strong>, baca sensor, kontrol GPIO: semua dari chat, tanpa nulis C++.</p>
             <p>Hasilnya <strong class="text-hitam">tersimpan otomatis</strong> di NVS ESP32. Reset berkali-kali pun logic tetap jalan.</p>
           </div>
         </div>
@@ -136,17 +151,17 @@
           Kenapa ArduClaw?
         </h2>
         <p class="text-[14px] text-[#6E6E73] leading-relaxed mb-4">
-          Sudah ada <a href="https://esp-claw.com" class="text-redpd font-bold hover:underline" target="_blank">ESP-Claw</a> dari Espressif &mdash; kenapa bikin lagi?
+          Sudah ada <a href="https://esp-claw.com" class="text-redpd font-bold hover:underline" target="_blank">ESP-Claw</a> dari Espressif: kenapa bikin lagi?
         </p>
         <p class="text-[14px] text-[#6E6E73] leading-relaxed mb-4">
-          ESP-Claw memang canggih, tapi <span class="font-bold text-hitam">terbatas</span> &mdash; hanya berjalan di board tertentu seperti <span class="font-bold text-hitam">ESP32-S3</span>. Board ESP32 murah seperti ESP32-WROOM, ESP32-C3, atau ESP32 dengan RAM &lt; 1MB tidak didukung.
+          ESP-Claw memang canggih, tapi <span class="font-bold text-hitam">terbatas</span>: hanya berjalan di board tertentu seperti <span class="font-bold text-hitam">ESP32-S3</span>. Board ESP32 murah seperti ESP32-WROOM, ESP32-C3, atau ESP32 dengan RAM &lt; 1MB tidak didukung.
         </p>
         <p class="text-[14px] text-[#6E6E73] leading-relaxed mb-4">
-          <span class="font-bold text-hitam">ArduClaw</span> hadir untuk mengubah itu. <span class="font-bold text-hitam">Masih beta</span> &mdash; saat ini baru support <span class="font-bold text-hitam">board ESP32 DEV</span> yang paling banyak dijual di pasaran. Ke depannya akan dikembangkan untuk board ESP32 lain.
+          <span class="font-bold text-hitam">ArduClaw</span> hadir untuk mengubah itu. <span class="font-bold text-hitam">Masih beta</span>: saat ini baru support <span class="font-bold text-hitam">board ESP32 DEV</span> yang paling banyak dijual di pasaran. Ke depannya akan dikembangkan untuk board ESP32 lain.
         </p>
         <div class="bg-redpd/5 border border-redpd/15 rounded-2xl px-5 py-4 mt-5">
           <p class="text-[14px] text-hitam font-bold leading-relaxed">
-            &ldquo;Ini bakal mengubah cara ngoding ESP32 &mdash; dari nulis <code class="text-[13px] bg-[#f0f0f5] px-2 py-0.5 rounded font-mono">digitalWrite(27, HIGH)</code>
+            &ldquo;Ini bakal mengubah cara ngoding ESP32: dari nulis <code class="text-[13px] bg-[#f0f0f5] px-2 py-0.5 rounded font-mono">digitalWrite(27, HIGH)</code>
             jadi cukup bilang <span class="text-redpd">nyalakan lampu di pin 27</span>.&rdquo;
           </p>
         </div>
@@ -167,14 +182,14 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F9A61A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
         </div>
         <h3 class="text-[14px] font-extrabold text-hitam mb-1">Logika &amp; MQTT</h3>
-        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Bikin logika if/else, subscribe MQTT, baca sensor &mdash; semua dari chat tanpa coding manual.</p>
+        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Bikin logika if/else, subscribe MQTT, baca sensor: semua dari chat tanpa coding manual.</p>
       </div>
       <div class="bg-white/70 backdrop-blur-sm border border-abu/30 rounded-2xl p-5 text-left">
         <div class="w-9 h-9 rounded-[11px] bg-[#e8e4f0] flex items-center justify-center mb-3">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#533AB7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
         <h3 class="text-[14px] font-extrabold text-hitam mb-1">Persisten (NVS)</h3>
-        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Semua konfigurasi &amp; logika tersimpan di NVS &mdash; gak hilang meski ESP32 di-reset atau dimatikan.</p>
+        <p class="text-[12px] text-[#6E6E73] leading-relaxed">Semua konfigurasi &amp; logika tersimpan di NVS: gak hilang meski ESP32 di-reset atau dimatikan.</p>
       </div>
       <div class="bg-white/70 backdrop-blur-sm border border-abu/30 rounded-2xl p-5 text-left">
         <div class="w-9 h-9 rounded-[11px] bg-redpd/10 flex items-center justify-center mb-3">
@@ -190,7 +205,7 @@
   <footer class="relative z-10 w-full border-t border-abu/20 bg-white/40 backdrop-blur-sm mt-12">
     <div class="max-w-[1120px] mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-[#8E8E93]">
       <div class="flex items-center gap-2">
-        <span>&copy; 2026</span>
+        <span>&copy; <script>document.write(new Date().getFullYear())</script></span>
         <a href="https://avisha.id/arduclaw" class="font-bold text-hitam hover:text-redpd transition-colors no-underline">ArduClaw</a>
         <span>by</span>
         <a href="https://instagram.com/ajangrahmat" class="font-bold text-hitam hover:text-redpd transition-colors no-underline" target="_blank">AjangRahmat</a>

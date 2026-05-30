@@ -2,12 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Documentation — ArduClaw</title>
+  <meta name="theme-color" content="#F31D1C" />
+  <title>Documentation | ArduClaw</title>
   <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="canonical" href="https://avisha.id/arduclaw/docs-en.html" />
-  <meta name="description" content="ArduClaw documentation — AI Agent Runtime for ESP32. Getting started, prompt examples, skill system, MQTT, GPIO." />
-  <meta property="og:title" content="Documentation — ArduClaw AI Agent Runtime" />
+  <link rel="alternate" hreflang="id" href="https://avisha.id/arduclaw/docs.html" />
+  <link rel="alternate" hreflang="en" href="https://avisha.id/arduclaw/docs-en.html" />
+  <link rel="alternate" hreflang="x-default" href="https://avisha.id/arduclaw/docs.html" />
+  <meta name="description" content="ArduClaw documentation | AI Agent Runtime for ESP32. Getting started, prompt examples, skill system, MQTT, GPIO." />
+  <meta property="og:title" content="Documentation | ArduClaw AI Agent Runtime" />
   <meta property="og:description" content="Complete guide: installation, configuration, skills, prompts, MQTT, GPIO." />
   <meta property="og:image" content="https://avisha.id/arduclaw/maskot.webp" />
   <meta property="og:url" content="https://avisha.id/arduclaw/docs-en.html" />
@@ -36,7 +43,8 @@
     .prose blockquote strong{color:#171717}
     .prose hr{border:none;border-top:1px solid rgba(207,207,207,.3);margin:2rem 0}
     @media(max-width:767px){.prose h2{font-size:1.25rem}.prose h3{font-size:1rem}.prose p,.prose li,.prose blockquote{font-size:.875rem}.prose code{font-size:.75rem}.prose pre{font-size:.75rem;padding:12px}}
-  </style>
+    html.dark .prose h2,html.dark .prose h3,html.dark .prose p strong,html.dark .prose li strong,html.dark .prose blockquote strong,html.dark .prose code{color:#e0e0e0!important}html.dark .prose p,html.dark .prose li,html.dark .prose blockquote{color:#a0a0a5!important}html.dark .prose code{background:#2a2a2a!important}html.dark .prose blockquote{background:#1e1e1e!important}html.dark .prose a{color:#ff6b6b!important}html.dark .prose hr{border-color:rgba(255,255,255,0.1)!important}
+  </style>  <script>var t=localStorage.getItem('theme');if(t==='light')document.documentElement.className='';else if(t==='dark'||matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.className='dark';else document.documentElement.className='';function toggleTheme(){var h=document.documentElement;if(h.className==='dark'){h.className='';localStorage.setItem('theme','light')}else{h.className='dark';localStorage.setItem('theme','dark')}}</script>
 </head>
 <body class="bg-[#f5f5f7] min-h-screen font-nunito text-hitam antialiased">
 
@@ -55,7 +63,7 @@
           <span class="text-[10px] font-medium text-abu tracking-[.03em] -mt-0.5">ArduMeka Claw AI Bot</span>
         </div>
       </a>
-      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" style="-webkit-tap-highlight-color:transparent">
+      <button onclick="document.getElementById('navMenuMobile').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" aria-label="Open navigation menu" style="-webkit-tap-highlight-color:transparent">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <div class="hidden md:flex items-center gap-1 text-[15px] font-bold">
@@ -65,6 +73,10 @@
         <span class="w-px h-4 bg-abu/40 mx-1.5"></span>
         <a href="docs.html" class="block px-2 py-1 rounded-lg text-hitam hover:bg-redpd/10 hover:text-redpd text-[13px] font-bold transition-colors">ID</a>
         <a href="docs-en.html" class="block px-2 py-1 rounded-lg bg-redpd/10 text-redpd text-[13px] font-bold transition-colors">EN</a>
+        <button onclick="toggleTheme()" class="p-1.5 ml-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" aria-label="Toggle dark mode">
+  <svg class="theme-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg class="theme-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </div>
     </div>
     <div class="hidden md:hidden absolute top-full left-0 w-full bg-white/95 backdrop-blur-lg border-b border-abu/30 px-4 py-3 flex flex-col gap-1 text-[15px] font-bold shadow-lg z-40" id="navMenuMobile">
@@ -74,6 +86,10 @@
       <div class="flex items-center gap-2 mt-1 pt-2 border-t border-abu/20 text-[13px] font-bold">
         <a href="docs.html" class="block px-3 py-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors">ID</a>
         <a href="docs-en.html" class="block px-3 py-1 rounded-lg bg-redpd/10 text-redpd">EN</a>
+        <button onclick="toggleTheme()" class="p-1.5 ml-1 rounded-lg text-hitam hover:bg-redpd/10 transition-colors" aria-label="Toggle dark mode">
+  <svg class="theme-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg class="theme-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </div>
     </div>
   </nav>
@@ -108,6 +124,7 @@
           <a href="#gpio" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="gpio">GPIO Skills</a>
           <a href="#monitor" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="monitor">Monitor Skill</a>
           <a href="#adc" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="adc">ADC Skill</a>
+          <a href="#file" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="file">File Skills</a>
           <a href="#mqtt" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="mqtt">MQTT Skills</a>
           <a href="#system" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="system">System Skills</a>
           <a href="#dashboard" class="toc-link block px-3 py-1.5 rounded-lg text-hitam hover:bg-redpd/5 hover:text-redpd no-underline transition-colors" data-target="dashboard">Web Dashboard</a>
@@ -136,6 +153,7 @@
         <a href="#gpio" class="text-hitam hover:text-redpd no-underline transition-colors">GPIO Skills</a>
         <a href="#monitor" class="text-hitam hover:text-redpd no-underline transition-colors">Monitor Skill</a>
         <a href="#adc" class="text-hitam hover:text-redpd no-underline transition-colors">ADC Skill</a>
+        <a href="#file" class="text-hitam hover:text-redpd no-underline transition-colors">File Skills</a>
         <a href="#mqtt" class="text-hitam hover:text-redpd no-underline transition-colors">MQTT Skills</a>
         <a href="#system" class="text-hitam hover:text-redpd no-underline transition-colors">System Skills</a>
         <a href="#dashboard" class="text-hitam hover:text-redpd no-underline transition-colors">Web Dashboard</a>
@@ -159,12 +177,12 @@
         The AI translates your commands into real actions on GPIO, MQTT, ADC, and more.
       </p>
       <p>
-        Currently in <strong>beta</strong> &mdash; supports <strong>ESP32 DEV</strong> boards (ESP32-WROOM, ESP32-DevKitC).
+        Currently in <strong>beta</strong>: supports <strong>ESP32 DEV</strong> boards (ESP32-WROOM, ESP32-DevKitC).
         More boards coming soon.
       </p>
       <blockquote>
         <strong>The idea:</strong> Instead of writing <code>digitalWrite(27, HIGH)</code>,
-        just say <em>&ldquo;turn on the LED at pin 27&rdquo;</em> &mdash; the AI Agent handles the rest.
+        just say <em>&ldquo;turn on the LED at pin 27&rdquo;</em>: the AI Agent handles the rest.
       </blockquote>
 
       <hr />
@@ -180,18 +198,18 @@
       </ul>
       <p>Steps:</p>
       <ol>
-        <li><strong>Flash firmware</strong> &mdash; open <a href="flash-en.html">Flash Firmware</a>, connect USB, upload <code>arduclaw-esp32-v02.bin</code></li>
+        <li><strong>Flash firmware</strong>: open <a href="flash-en.html">Flash Firmware</a>, connect USB, upload <code>arduclaw-esp32-v02.bin</code></li>
         <li><strong>Press RESET (EN)</strong> on the ESP32 board, wait 2 seconds</li>
-        <li><strong>Connect Serial</strong> &mdash; click Connect Serial in the WiFi column</li>
+        <li><strong>Connect Serial</strong>: click Connect Serial in the WiFi column</li>
         <li><strong>Enter SSID &amp; Password</strong>, click Save</li>
-        <li><strong>Wait</strong> until status shows Connected &mdash; IP will appear</li>
-        <li><strong>Set LLM Config</strong> &mdash; URL, API Key, Model, click Save &amp; Test</li>
-        <li><strong>Open Dashboard</strong> &mdash; click the IP link that appears</li>
-        <li><strong>Start Chatting</strong> &mdash; send prompts like &ldquo;turn on LED at pin 27&rdquo;</li>
+        <li><strong>Wait</strong> until status shows Connected: IP will appear</li>
+        <li><strong>Set LLM Config</strong>: URL, API Key, Model, click Save &amp; Test</li>
+        <li><strong>Open Dashboard</strong>: click the IP link that appears</li>
+        <li><strong>Start Chatting</strong>: send prompts like &ldquo;turn on LED at pin 27&rdquo;</li>
       </ol>
       <blockquote>
         <strong>Note:</strong> After flashing, all configuration (WiFi, LLM, MQTT subscriptions, GPIO mode)
-        is stored in the ESP32's NVS &mdash; it persists across power cycles. It will only be lost if you
+        is stored in the ESP32's NVS: it persists across power cycles. It will only be lost if you
         <em>re-flash</em> with the merged binary.
       </blockquote>
 
@@ -201,16 +219,16 @@
       <h2 id="flash">3. Flash Firmware</h2>
       <p>Use the <a href="flash-en.html">Flash Firmware</a> page to upload firmware to the ESP32:</p>
       <ol>
-        <li>Click <strong>Connect to Device</strong> &mdash; select the ESP32 USB port</li>
-        <li>Select the <code>.bin</code> firmware file &mdash; use built-in or upload manually</li>
-        <li>Click <strong>Flash</strong> &mdash; wait for the progress bar to complete</li>
+        <li>Click <strong>Connect to Device</strong>: select the ESP32 USB port</li>
+        <li>Select the <code>.bin</code> firmware file: use built-in or upload manually</li>
+        <li>Click <strong>Flash</strong>: wait for the progress bar to complete</li>
         <li>After completion, press <strong>RESET (EN)</strong> on the board</li>
         <li>Proceed to WiFi &amp; LLM configuration via Serial</li>
       </ol>
       <p>Other functions:</p>
       <ul>
-        <li><strong>Erase</strong> &mdash; wipes all flash including NVS</li>
-        <li><strong>Download</strong> &mdash; download the built-in firmware for manual flashing</li>
+        <li><strong>Erase</strong>: wipes all flash including NVS</li>
+        <li><strong>Download</strong>: download the built-in firmware for manual flashing</li>
       </ul>
 
       <hr />
@@ -221,8 +239,8 @@
       <ol>
         <li>Make sure Serial is connected (click <strong>Connect Serial</strong> in the WiFi column)</li>
         <li>Enter <strong>SSID</strong> and <strong>Password</strong></li>
-        <li>Click <strong>Save</strong> &mdash; the board will save and attempt to connect</li>
-        <li>Wait for <strong>Connected</strong> status &mdash; IP will appear in the banner</li>
+        <li>Click <strong>Save</strong>: the board will save and attempt to connect</li>
+        <li>Wait for <strong>Connected</strong> status: IP will appear in the banner</li>
         <li>Click the IP link to open the ESP32 <strong>Dashboard</strong></li>
       </ol>
       <p>Command format sent via Serial:</p>
@@ -237,9 +255,9 @@
       <p>ArduClaw requires an OpenAI-compatible LLM API to process prompts:</p>
       <ol>
         <li>Serial must be connected (click <strong>Connect Serial</strong> in the LLM column)</li>
-        <li>Enter the <strong>API URL</strong> &mdash; e.g. <code>https://ai.sumopod.com/v1/chat/completions</code></li>
+        <li>Enter the <strong>API URL</strong>: e.g. <code>https://ai.sumopod.com/v1/chat/completions</code></li>
         <li>Enter your <strong>API Key</strong> from your LLM provider</li>
-        <li>Enter the <strong>Model</strong> &mdash; e.g. <code>gpt-4o-mini</code>, <code>claude-3-haiku</code>, etc.</li>
+        <li>Enter the <strong>Model</strong>: e.g. <code>gpt-4o-mini</code>, <code>claude-3-haiku</code>, etc.</li>
         <li>Click <strong>Save Config</strong></li>
         <li>Click <strong>Test</strong> to verify the LLM connection</li>
       </ol>
@@ -266,7 +284,7 @@
         <li>The LLM determines which skill to execute</li>
         <li>ESP32 executes the skill (GPIO, MQTT, etc.) and returns the result</li>
       </ol>
-      <p>Chat history is <strong>automatically saved</strong> in the browser's localStorage &mdash; it persists across page refreshes.</p>
+      <p>Chat history is <strong>automatically saved</strong> in the browser's localStorage: it persists across page refreshes.</p>
 
       <hr />
 
@@ -298,8 +316,8 @@ stop monitoring pin 26</code></pre>
 monitor sensor at pin 34 every 1 second</code></pre>
 
       <h3>MQTT</h3>
-      <pre><code>subscribe mqtt topic home/light with action gpio.write pin 27 {on, off}
-receive data from mqtt topic sensor/temp then action gpio.write pin 2 {on, off}
+      <pre><code>subscribe mqtt topic home/light, if message on turn on led pin 27, if off turn off
+receive data from mqtt topic sensor/128219821/temp, if on turn on led pin 2, if off turn off
 list mqtt subscriptions
 remove subscription topic home/light
 remove all mqtt subscriptions</code></pre>
@@ -310,6 +328,25 @@ what is the heap size?
 what is the ESP32 uptime?
 restart ESP32
 factory reset</code></pre>
+
+      <h3>PWM &amp; Servo</h3>
+      <pre><code>set LED brightness at pin 27 to half
+set pin 27 pwm 75%
+servo pin 27 to 90 degrees
+rotate servo pin 27 to 0 degrees</code></pre>
+
+      <h3>File</h3>
+      <pre><code>save file config.json with content {"mode":"auto"}
+read file config.json</code></pre>
+
+      <h3>MQTT Advanced</h3>
+      <pre><code>publish on to topic home/light
+bridge mqtt topic sensor/temp to pin 27 (>0=ON,0=OFF)
+auto-publish changes on pin 26 to topic home/switch</code></pre>
+
+      <h3>System Sleep</h3>
+      <pre><code>sleep ESP32 for 60 seconds
+sleep 30 seconds, wake with pin 26</code></pre>
 
       <hr />
 
@@ -350,6 +387,23 @@ args: {"pin":2,"on_ms":300,"off_ms":500}
 tool: gpio.blink_stop
 args: {"pin":2}</code></pre>
 
+      <h3>gpio.write_pwm</h3>
+      <p>PWM output (pulse-width modulation) for LED brightness or motor speed. Duty 0-255, freq default 5000 Hz:</p>
+      <pre><code>tool: gpio.write_pwm
+args: {"pin":27,"duty":128,"freq":5000}
+// duty=0 → off, duty=255 → max, duty=128 → 50%</code></pre>
+
+      <h3>gpio.servo</h3>
+      <p>Standard servo control (0-180°). Uses LEDC 50Hz 12-bit:</p>
+      <pre><code>tool: gpio.servo
+args: {"pin":27,"angle":90}</code></pre>
+
+      <h3>gpio.debounce</h3>
+      <p>Button debounce input. When pin state is stable for ms, action is triggered. Ideal for push buttons or switches:</p>
+      <pre><code>tool: gpio.debounce
+args: {"pin":26,"ms":50,"action":"gpio.write","action_args":{"pin":27,"value":true}}
+// Every time P26 changes stable >50ms, write HIGH to P27</code></pre>
+
       <hr />
 
       <!-- Monitor -->
@@ -360,13 +414,13 @@ args: {"pin":2}</code></pre>
       </p>
       <p>Parameters:</p>
       <ul>
-        <li><strong>pin</strong> &mdash; GPIO pin number to monitor</li>
-        <li><strong>trigger</strong> &mdash; <code>low</code>, <code>high</code>, or <code>change</code></li>
-        <li><strong>action</strong> &mdash; skill to execute (e.g. <code>gpio.write</code>)</li>
-        <li><strong>action_args</strong> &mdash; arguments for the skill (e.g. <code>{"pin":27,"value":true}</code>)</li>
-        <li><strong>poll</strong> &mdash; polling interval in ms (default 50)</li>
-        <li><strong>debounce</strong> &mdash; debounce time in ms (default 30)</li>
-        <li><strong>once</strong> &mdash; if true, monitor fires once then stops</li>
+        <li><strong>pin</strong>: GPIO pin number to monitor</li>
+        <li><strong>trigger</strong>: <code>low</code>, <code>high</code>, or <code>change</code></li>
+        <li><strong>action</strong>: skill to execute (e.g. <code>gpio.write</code>)</li>
+        <li><strong>action_args</strong>: arguments for the skill (e.g. <code>{"pin":27,"value":true}</code>)</li>
+        <li><strong>poll</strong>: polling interval in ms (default 50)</li>
+        <li><strong>debounce</strong>: debounce time in ms (default 30)</li>
+        <li><strong>once</strong>: if true, monitor fires once then stops</li>
       </ul>
       <pre><code>tool: gpio.monitor
 args: {"pin":26,"trigger":"low","action":"gpio.write","action_args":{"pin":27,"value":true},"poll":50,"debounce":30,"once":false}</code></pre>
@@ -385,8 +439,25 @@ args: {"pin":34}
 
       <hr />
 
+      <!-- File -->
+      <h2 id="file">11. File Skills</h2>
+      <p>Save and read small data in NVS. Useful for storing configuration or state.</p>
+
+      <h3>file.write</h3>
+      <p>Save file data (max ~4KB per file, total NVS limit ~15KB):</p>
+      <pre><code>tool: file.write
+args: {"path":"config.json","content":"{\"mode\":\"auto\"}"}</code></pre>
+
+      <h3>file.read</h3>
+      <p>Read a saved file:</p>
+      <pre><code>tool: file.read
+args: {"path":"config.json"}
+// returns: {"mode":"auto"}</code></pre>
+
+      <hr />
+
       <!-- MQTT -->
-      <h2 id="mqtt">11. MQTT Skills</h2>
+      <h2 id="mqtt">12. MQTT Skills</h2>
       <p>
         MQTT enables the ESP32 to communicate with an MQTT broker for IoT applications.
         Subscriptions can be added via chat and are automatically saved to NVS.
@@ -417,16 +488,38 @@ args: {}</code></pre>
       <pre><code>tool: mqtt.status
 args: {}</code></pre>
 
+      <h3>mqtt.publish</h3>
+      <p>Publish a message to an MQTT topic:</p>
+      <pre><code>tool: mqtt.publish
+args: {"topic":"home/light","payload":"on"}</code></pre>
+
+      <h3>mqtt.gpio_bridge</h3>
+      <p>Subscribe to an MQTT topic, parse numeric payload: &gt;0 → pin HIGH, 0 → pin LOW. No manual <code>action_args</code> needed:</p>
+      <pre><code>tool: mqtt.gpio_bridge
+args: {"topic":"sensor/temp","pin":27}
+// Payload "1" → P27 HIGH, payload "0" → P27 LOW</code></pre>
+
+      <h3>mqtt.publish_on_change</h3>
+      <p>Monitor a pin's digital state changes and auto-publish to MQTT when state flips:</p>
+      <pre><code>tool: mqtt.publish_on_change
+args: {"pin":26,"topic":"home/switch","high_msg":"on","low_msg":"off"}
+// P26 HIGH → publish "on", P26 LOW → publish "off"</code></pre>
+
+      <h3>mqtt.reconnect</h3>
+      <p>Request reconnect to MQTT broker:</p>
+      <pre><code>tool: mqtt.reconnect
+args: {}</code></pre>
+
       <h3>Built-in MQTT Handler</h3>
       <p>
         The ESP32 has a built-in handler for the topic <strong>hello/10219201/test</strong>.
         Payload <code>on</code> turns GPIO 27 on, payload <code>off</code> turns it off.
-        This handler auto-subscribes when the broker connects &mdash; no manual setup needed.
+        This handler auto-subscribes when the broker connects: no manual setup needed.
       </p>
 
       <h3>Persistence</h3>
       <p>
-        All MQTT subscriptions are <strong>saved to NVS</strong> &mdash; they survive reboots.
+        All MQTT subscriptions are <strong>saved to NVS</strong>: they survive reboots.
         Subscriptions are restored and synced to the broker every time WiFi/MQTT reconnects.
         Only lost if you <em>re-flash</em> with the merged binary (which erases NVS).
       </p>
@@ -434,12 +527,34 @@ args: {}</code></pre>
       <hr />
 
       <!-- System -->
-      <h2 id="system">12. System Skills</h2>
+      <h2 id="system">13. System Skills</h2>
 
       <h3>system.status</h3>
       <p>Display ESP32 status: WiFi, IP, uptime, heap, skill count, MQTT subscriptions:</p>
       <pre><code>tool: system.status
 args: {}</code></pre>
+
+      <h3>system.restart</h3>
+      <p>Restart ESP32 (1.5s delay so response is sent first):</p>
+      <pre><code>tool: system.restart
+args: {}</code></pre>
+
+      <h3>system.wifi</h3>
+      <p>WiFi details: SSID, RSSI, IP, MAC, channel:</p>
+      <pre><code>tool: system.wifi
+args: {}</code></pre>
+
+      <h3>system.memory</h3>
+      <p>Check heap RAM status:</p>
+      <pre><code>tool: system.memory
+args: {}
+// returns: Heap: free=... min=... max=...</code></pre>
+
+      <h3>system.sleep</h3>
+      <p>Deep sleep for power saving. Auto wake after N seconds, optional wake pin (LOW trigger):</p>
+      <pre><code>tool: system.sleep
+args: {"seconds":30,"wake_pin":26}
+// Sleep 30 seconds, or press button on P26 (LOW) to wake</code></pre>
 
       <h3>system.clear_persist</h3>
       <p>Clear all persistent data (monitors, GPIO mode, MQTT subs) without reboot:</p>
@@ -447,42 +562,53 @@ args: {}</code></pre>
 args: {}</code></pre>
 
       <h3>system.reset_factory</h3>
-      <p>Factory reset &mdash; wipes all NVS, restarts ESP32. Board will be like freshly flashed:</p>
+      <p>Factory reset: wipes all NVS, restarts ESP32. Board will be like freshly flashed:</p>
       <pre><code>tool: system.reset_factory
 args: {}</code></pre>
 
       <hr />
 
       <!-- Dashboard -->
-      <h2 id="dashboard">13. Web Dashboard</h2>
+      <h2 id="dashboard">14. Web Dashboard</h2>
       <p>
         Once the ESP32 is connected to WiFi, open the board's IP in a browser to access the dashboard.
         The following pages are available:
       </p>
       <ul>
-        <li><strong>Chat</strong> (/) &mdash; AI Agent chat interface. Prompts sent to LLM, skills executed in real-time.</li>
-        <li><strong>Dashboard</strong> (/dashboard) &mdash; System status: WiFi, IP, uptime, heap, skill count.</li>
-        <li><strong>WiFi</strong> (/wifi) &mdash; Change SSID/Password from the web.</li>
-        <li><strong>LLM</strong> (/llm) &mdash; Change LLM configuration from the web.</li>
-        <li><strong>MQTT</strong> (/mqtt) &mdash; View, add, and remove MQTT subscriptions.</li>
-        <li><strong>Skills</strong> (/skills) &mdash; List of all registered skills.</li>
+        <li><strong>Chat</strong> (/): AI Agent chat interface. Prompts sent to LLM, skills executed in real-time.</li>
+        <li><strong>Dashboard</strong> (/dashboard): System status: WiFi, IP, uptime, heap, skill count.</li>
+        <li><strong>WiFi</strong> (/wifi): Change SSID/Password from the web.</li>
+        <li><strong>LLM</strong> (/llm): Change LLM configuration from the web.</li>
+        <li><strong>MQTT</strong> (/mqtt): View, add, and remove MQTT subscriptions.</li>
+        <li><strong>Skills</strong> (/skills): List of all registered skills.</li>
       </ul>
       <p>
-        Navigation uses a horizontal menu on desktop &mdash; on mobile (≤600px) it becomes a
+        The dashboard displays <strong>Active Logic</strong>: all GPIO outputs, blink, monitor,
+        debounce, PWM, servo, publish-on-change, file, and MQTT subscriptions currently running
+        — updated automatically when the page loads.
+      </p>
+      <p>
+        Navigation uses a horizontal menu on desktop: on mobile (≤600px) it becomes a
         <strong>hamburger dropdown menu</strong>.
       </p>
 
       <hr />
 
       <!-- Persist -->
-      <h2 id="persist">14. Persistence (NVS)</h2>
+      <h2 id="persist">15. Persistence (NVS)</h2>
       <p>ArduClaw uses <strong>Preferences (NVS)</strong> on the ESP32 to store data persistently. Stored data includes:</p>
       <ul>
-        <li><strong>WiFi config</strong> &mdash; SSID &amp; password</li>
-        <li><strong>LLM config</strong> &mdash; API URL, key, model</li>
-        <li><strong>GPIO mode</strong> &mdash; pin modes set via <code>gpio.mode</code></li>
-        <li><strong>Monitor config</strong> &mdash; <code>gpio.monitor</code> configurations</li>
-        <li><strong>MQTT subscriptions</strong> &mdash; topic + action list (max 20)</li>
+        <li><strong>WiFi config</strong>: SSID &amp; password</li>
+        <li><strong>LLM config</strong>: API URL, key, model</li>
+        <li><strong>GPIO mode</strong>: pin modes set via <code>gpio.mode</code></li>
+        <li><strong>GPIO output</strong>: output pin values (HIGH/LOW) set via <code>gpio.write</code></li>
+        <li><strong>Blink config</strong>: <code>gpio.blink_start</code> configurations</li>
+        <li><strong>Monitor config</strong>: <code>gpio.monitor</code> configurations</li>
+        <li><strong>PWM config</strong>: duty &amp; freq via <code>gpio.write_pwm</code></li>
+        <li><strong>Debounce config</strong>: <code>gpio.debounce</code> configurations</li>
+        <li><strong>Publish-on-change config</strong>: auto-publish MQTT via <code>mqtt.publish_on_change</code></li>
+        <li><strong>File storage</strong>: data from <code>file.write</code> (stored in NVS as JSON map)</li>
+        <li><strong>MQTT subscriptions</strong>: topic + action list (max 20)</li>
       </ul>
       <p>
         Persistent data is automatically restored on every boot. <strong>Note:</strong> flashing the merged binary
@@ -492,14 +618,14 @@ args: {}</code></pre>
       <hr />
 
       <!-- Troubleshoot -->
-      <h2 id="troubleshoot">15. Troubleshooting</h2>
+      <h2 id="troubleshoot">16. Troubleshooting</h2>
 
       <h3>Web Serial not showing up</h3>
       <p>Use the latest version of Chrome or Edge. Web Serial is not supported in Firefox or Safari.</p>
 
       <h3>Flash fails / timeout</h3>
       <ul>
-        <li>Try a different USB cable &mdash; some cables are charge-only, not data</li>
+        <li>Try a different USB cable: some cables are charge-only, not data</li>
         <li>Hold <strong>BOOT</strong> on the ESP32 while connecting, release after flash starts</li>
         <li>Lower the baud rate (change <code>115200</code> to <code>921600</code> in connFlash)</li>
       </ul>
@@ -513,22 +639,22 @@ args: {}</code></pre>
 
       <h3>WiFi won't connect</h3>
       <ul>
-        <li>Check SSID &amp; password &mdash; ESP32 doesn't support 5GHz WiFi, must be 2.4GHz</li>
+        <li>Check SSID &amp; password: ESP32 doesn't support 5GHz WiFi, must be 2.4GHz</li>
         <li>Make sure your router isn't blocking new devices</li>
         <li>Try restarting the ESP32 (press RESET)</li>
       </ul>
 
       <h3>LLM test fails</h3>
       <ul>
-        <li>Check the API URL &mdash; must be OpenAI-compatible</li>
-        <li>Check the API Key &mdash; make sure it's valid and not expired</li>
-        <li>Check the model name &mdash; different providers use different names</li>
+        <li>Check the API URL: must be OpenAI-compatible</li>
+        <li>Check the API Key: make sure it's valid and not expired</li>
+        <li>Check the model name: different providers use different names</li>
         <li>Make sure the ESP32 is connected to WiFi</li>
       </ul>
 
       <h3>MQTT subscriptions lost after re-flash</h3>
       <p>
-        This is expected &mdash; the merged binary flashes from offset 0 and erases NVS.
+        This is expected: the merged binary flashes from offset 0 and erases NVS.
         Re-add subscriptions via chat after setup. Subscriptions are safe across <strong>normal reboots</strong>
         (without re-flashing).
       </p>
@@ -543,7 +669,7 @@ args: {}</code></pre>
       <hr />
 
       <!-- Strapping -->
-      <h2 id="strapping">16. Strapping Pins</h2>
+      <h2 id="strapping">17. Strapping Pins</h2>
       <p>
         ESP32 has <strong>strapping pins</strong> that affect boot mode:
         GPIO <strong>0</strong>, <strong>2</strong>, <strong>5</strong>, <strong>12</strong>, <strong>15</strong>.
@@ -551,12 +677,12 @@ args: {}</code></pre>
       </p>
       <p>
         ArduClaw will <strong>warn</strong> when you use strapping pins,
-        but it <strong>does not block</strong> you &mdash; use at your own risk.
+        but it <strong>does not block</strong> you: use at your own risk.
         Warnings appear in:
       </p>
       <ul>
-        <li><strong>Serial console</strong> &mdash; <code>[WARN] gpio.write: GPIO 0 is a strapping pin!</code></li>
-        <li><strong>Chat bubble</strong> &mdash; skill results are appended with <code>⚠️Strapping pin!</code></li>
+        <li><strong>Serial console</strong>: <code>[WARN] gpio.write: GPIO 0 is a strapping pin!</code></li>
+        <li><strong>Chat bubble</strong>: skill results are appended with <code>⚠️Strapping pin!</code></li>
       </ul>
       <blockquote>
         <strong>Recommendation:</strong> Avoid strapping pins for production projects. Use GPIO 4, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33 instead.
@@ -565,23 +691,23 @@ args: {}</code></pre>
       <hr />
 
       <!-- FAQ -->
-      <h2 id="faq">17. FAQ</h2>
+      <h2 id="faq">18. FAQ</h2>
 
       <h3>What's the difference between ArduClaw and ESP-Claw?</h3>
       <p>
         ESP-Claw by Espressif only supports ESP32-S3 boards with ≥ 1MB RAM.
-        ArduClaw supports the widely available <strong>ESP32 DEV</strong> boards &mdash;
+        ArduClaw supports the widely available <strong>ESP32 DEV</strong> boards:
         ESP32-WROOM, ESP32-DevKitC, and similar.
       </p>
 
       <h3>Does it require a constant internet connection?</h3>
       <p>
-        Yes &mdash; the LLM runs in the cloud via API. WiFi is required to send prompts.
+        Yes: the LLM runs in the cloud via API. WiFi is required to send prompts.
         Local (on-device) LLM support may come in the future.
       </p>
 
       <h3>How many skills can be registered?</h3>
-      <p>Maximum 20 registered skills. Currently there are ~15 built-in skills.</p>
+      <p>Maximum 30 registered skills. Currently there are ~31 built-in skills.</p>
 
       <h3>How many MQTT subscriptions?</h3>
       <p>Maximum <strong>20 active subscriptions</strong>.</p>
@@ -589,7 +715,7 @@ args: {}</code></pre>
       <h3>Is it safe to use strapping pins?</h3>
       <p>
         Not recommended for production. For prototyping/testing, ArduClaw only warns
-        &mdash; it doesn't block you. Pins 0, 2, 5, 12, 15 will still work.
+       : it doesn't block you. Pins 0, 2, 5, 12, 15 will still work.
       </p>
 
       <h3>How do I factory reset?</h3>
@@ -600,8 +726,8 @@ args: {}</code></pre>
 
       <h3>Does chat history survive a page refresh?</h3>
       <p>
-        Yes &mdash; chat is saved in the browser's <strong>localStorage</strong>.
-        However, history is per-browser &mdash; it does not sync across devices.
+        Yes: chat is saved in the browser's <strong>localStorage</strong>.
+        However, history is per-browser: it does not sync across devices.
       </p>
 
       <h3>Can I use ESP32-C3 / ESP32-S2 / ESP32-S3?</h3>
@@ -623,7 +749,7 @@ args: {}</code></pre>
   <footer class="relative z-10 w-full border-t border-abu/20 bg-white/40 backdrop-blur-sm">
     <div class="max-w-[1120px] mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-[#8E8E93]">
       <div class="flex items-center gap-2">
-        <span>&copy; 2026</span>
+        <span>&copy; <script>document.write(new Date().getFullYear())</script></span>
         <a href="https://avisha.id/arduclaw" class="font-bold text-hitam hover:text-redpd transition-colors no-underline">ArduClaw</a>
         <span>by</span>
         <a href="https://instagram.com/ajangrahmat" class="font-bold text-hitam hover:text-redpd transition-colors no-underline" target="_blank">AjangRahmat</a>

@@ -128,6 +128,12 @@ bool    hasPersistentConfig();    // true jika pernah dikonfigurasi via chat
 void    clearPersistentConfig();  // kosongkan config tapi tetap tandai "pernah dikonfigurasi"
 void    resetFactoryConfig();     // hapus SEMUA key NVS — boot berikutnya load factory defaults
 
+// ─────────────────────────────────────────────────────────────────────────
+// Dashboard / persist info — JSON strings untuk ditampilkan di UI
+// ─────────────────────────────────────────────────────────────────────────
+
+String persistJson();             // JSON: {gpio_outputs:[...], blinks:[...], monitors:[...], subs:[...], gpio_modes:[...]}
+
 }  // namespace skill
 
 #endif  // ARDUCLAW_SKILL_H
